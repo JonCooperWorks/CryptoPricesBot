@@ -73,11 +73,26 @@ func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 		reply(bot, update, fmt.Sprintf("Error decoding response for %s", ticker))
 		return
 	}
-	quoteMessage := fmt.Sprintf("1 %s = USD$%.8f", ticker, coinQuoteResponse["price_usd"])
-	log.Println(quoteMessage)
-	reply(bot, update, quoteMessage)
+	coinPriceUsd := coinQuoteResponse["price_usd"]
+	quoteMessage := getQuoteFormat(coinPriceUsd)
+	reply(bot, update,  fmt.Sprintf(quoteMessage, ticker, coinPriceUsd))
 
 }
+
+func getQuoteFormat(coinPriceUsd interface{}) string {
+	var quoteMessage string
+	switch coinPriceUsd.(type) {
+	case float64, float32:
+		if coinPriceUsd.(float64) < 0.01 {
+			quoteMessage = "1 %s = USD$%.8f"
+		} else {
+			quoteMessage = "1 %s = USD$%.2f"
+		}
+	}
+
+	return quoteMessage
+}
+
 
 func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, message)
