@@ -62,7 +62,7 @@ func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
 }
 
 func routeMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
-	if update.Message.GroupChatCreated {
+	if !strings.HasPrefix(update.Message.Text, "/") {
 		return
 	}
 
