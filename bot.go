@@ -1,33 +1,56 @@
 package main
 
 import (
-	"log"
-	"gopkg.in/telegram-bot-api.v4"
-	"net/http"
-	"fmt"
 	"encoding/json"
-	"strings"
+	"fmt"
+	"gopkg.in/telegram-bot-api.v4"
+	"log"
+	"net/http"
 	"os"
+	"strings"
 )
 
 const (
 	PRICE_API_ENDPOINT = "https://coincap.io/page/%s"
+	USERNAME_SEPARATOR = "@"
+	BOT_NAME           = USERNAME_SEPARATOR + "coincap_prices_bot"
+)
+
+/* Commands */
+const (
+	QUOTE_COMMAND = "/quote"
+	START_COMMAND = "/start"
+	HELP_COMMAND  = "/help"
 )
 
 var (
-	commands = map[string]func(*tgbotapi.BotAPI, tgbotapi.Update, []string){
-		"/start": Start,
-		"/quote": Quote,
+	controllers = map[string]Controller{
+		START_COMMAND: Start,
+		QUOTE_COMMAND: Quote,
+		HELP_COMMAND:  Help,
 	}
 )
 
+/* Messages */
+var (
+	WELCOME_MESSAGE string = "Ask me for prices with /quote (ticker). Example: /quote BTC"
+	HELP_MESSAGE    string = "Use me to get prices from https://coincap.io. Just type /quote (Ticker Symbol). For " +
+		"example, /quote BTC."
+)
+
+type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
+
 func Start(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
-	reply(bot, update, "Ask me for prices with /quote (ticker). Example: /quote BTC")
+	reply(bot, update, WELCOME_MESSAGE)
+}
+
+func Help(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
+	reply(bot, update, HELP_MESSAGE)
 }
 
 func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 	if len(arguments) < 1 {
-		reply(bot, update, "Usage: /quote (ticker)")
+		Help(bot, update, arguments)
 		return
 	}
 
@@ -41,6 +64,7 @@ func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 
 	if response.ContentLength == 2 {
 		reply(bot, update, fmt.Sprintf("%s is not on https://coincap.io", ticker))
+		return
 	}
 	var coinQuoteResponse map[string]interface{}
 	err = json.NewDecoder(response.Body).Decode(&coinQuoteResponse)
@@ -61,24 +85,32 @@ func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
 	bot.Send(msg)
 }
 
-func routeMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
-	if !strings.HasPrefix(update.Message.Text, "/") {
-		return
-	}
+func routeCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
+	if !update.Message.IsCommand() {
+		command := update.Message.Text
+		Quote(bot, update, []string{command})
+	} else {
+		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+		parts := strings.Split(update.Message.Text, " ")
+		if len(parts) < 1 {
+			Help(bot, update, []string{})
+			return
+		}
 
-	log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
-	parts := strings.Split(update.Message.Text, " ")
-	if len(parts) < 1 {
-		reply(bot, update, "Invalid command")
-		return
-	}
-	controller := commands[parts[0]]
-	if controller == nil {
-		reply(bot, update, "Command not found")
-		return
-	}
+		controllerName := parts[0]
+		if strings.Contains(controllerName, BOT_NAME) {
+			controllerName = strings.Split(controllerName, USERNAME_SEPARATOR)[0]
+		}
 
-	controller(bot, update, parts[1:])
+		controller := controllers[controllerName]
+		if controller == nil {
+			Help(bot, update, []string{})
+			return
+		}
+
+		controller(bot, update, parts[1:])
+		return
+	}
 }
 
 func main() {
@@ -100,6 +132,8 @@ func main() {
 		if update.Message == nil {
 			continue
 		}
-		routeMessage(bot, update)
+
+		routeCommand(bot, update)
+
 	}
 }
