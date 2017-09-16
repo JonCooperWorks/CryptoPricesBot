@@ -83,7 +83,7 @@ func getQuoteFormat(coinPriceUsd interface{}) string {
 	var quoteMessage string
 	switch coinPriceUsd.(type) {
 	case float64, float32:
-		if coinPriceUsd.(float64) < 0.01 {
+		if coinPriceUsd.(float64) < 0.99 {
 			quoteMessage = "1 %s = USD$%.8f"
 		} else {
 			quoteMessage = "1 %s = USD$%.2f"
