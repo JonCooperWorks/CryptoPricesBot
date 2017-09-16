@@ -34,9 +34,13 @@ func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 	ticker := strings.ToUpper(arguments[0])
 	url := fmt.Sprintf(PRICE_API_ENDPOINT, ticker)
 	response, err := http.Get(url)
-	if err != nil || response.StatusCode != 200 || response.ContentLength == 2{
+	if err != nil || response.StatusCode != 200 {
 		reply(bot, update, fmt.Sprintf("Error retreiving %s price", ticker))
 		return
+	}
+
+	if response.ContentLength == 2 {
+		reply(bot, update, fmt.Sprintf("%s is not on https://coincap.io", ticker))
 	}
 	var coinQuoteResponse map[string]interface{}
 	err = json.NewDecoder(response.Body).Decode(&coinQuoteResponse)
@@ -58,6 +62,10 @@ func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
 }
 
 func routeMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
+	if update.Message.GroupChatCreated {
+		return
+	}
+
 	log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 	parts := strings.Split(update.Message.Text, " ")
 	if len(parts) < 1 {
