@@ -28,6 +28,7 @@ func Start(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 	if len(arguments) < 1 {
 		reply(bot, update, "Usage: /quote (ticker)")
+		return
 	}
 
 	ticker := strings.ToUpper(arguments[0])
@@ -61,11 +62,14 @@ func routeMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	parts := strings.Split(update.Message.Text, " ")
 	if len(parts) < 1 {
 		reply(bot, update, "Invalid command")
+		return
 	}
 	controller := commands[parts[0]]
 	if controller == nil {
 		reply(bot, update, "Command not found")
+		return
 	}
+
 	controller(bot, update, parts[1:])
 }
 
