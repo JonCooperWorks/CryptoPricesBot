@@ -30,7 +30,7 @@ func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 		reply(bot, update, "Usage: /quote (ticker)")
 	}
 
-	ticker := arguments[0]
+	ticker := strings.ToUpper(arguments[0])
 	url := fmt.Sprintf(PRICE_API_ENDPOINT, ticker)
 	response, err := http.Get(url)
 	if err != nil || response.StatusCode != 200 || response.ContentLength == 2{
