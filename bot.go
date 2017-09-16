@@ -73,7 +73,7 @@ func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 		reply(bot, update, fmt.Sprintf("Error decoding response for %s", ticker))
 		return
 	}
-	quoteMessage := fmt.Sprintf("1 %s = USD$%.2f", ticker, coinQuoteResponse["price_usd"])
+	quoteMessage := fmt.Sprintf("1 %s = USD$%.8f", ticker, coinQuoteResponse["price_usd"])
 	log.Println(quoteMessage)
 	reply(bot, update, quoteMessage)
 
