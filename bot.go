@@ -22,23 +22,18 @@ var (
 )
 
 func Start(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
-	if len(arguments) != 0 {
-		reply(bot, update, "Why?")
-	}
-
-	reply(bot, update, "Ask me for prices with /quote (ticker)")
+	reply(bot, update, "Ask me for prices with /quote (ticker). Example: /quote BTC")
 }
 
 func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
-	if len(arguments) != 1 {
-		reply(bot, update, "Usage: /quote ticker")
+	if len(arguments) < 1 {
+		reply(bot, update, "Usage: /quote (ticker)")
 	}
 
 	ticker := arguments[0]
 	url := fmt.Sprintf(PRICE_API_ENDPOINT, ticker)
 	response, err := http.Get(url)
-	if err != nil {
-		log.Println(err.Error())
+	if err != nil || response.StatusCode != 200 || response.ContentLength == 2{
 		reply(bot, update, fmt.Sprintf("Error retreiving %s price", ticker))
 		return
 	}
