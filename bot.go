@@ -127,10 +127,6 @@ func routeCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	}
 }
 
-func worker(bot tgbotapi.BotAPI) {
-
-}
-
 func main() {
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_BOT_TOKEN"))
 	if err != nil {
