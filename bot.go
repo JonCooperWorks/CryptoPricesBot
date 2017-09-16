@@ -109,8 +109,11 @@ func routeCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		}
 
 		controller(bot, update, parts[1:])
-		return
 	}
+}
+
+func worker(bot tgbotapi.BotAPI) {
+
 }
 
 func main() {
@@ -133,7 +136,6 @@ func main() {
 			continue
 		}
 
-		routeCommand(bot, update)
-
+		go routeCommand(bot, update)
 	}
 }
