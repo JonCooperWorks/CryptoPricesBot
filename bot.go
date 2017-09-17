@@ -155,7 +155,8 @@ func NewQuote(first, second string) (*Quote, error) {
 			if isFiat(second) {
 				coinPrice = rawCoinPrice.(float64)
 			} else {
-				coinPrice = 1 / rawCoinPrice.(float64)
+				// Fees and whatnot
+				coinPrice = 0.993 / rawCoinPrice.(float64)
 			}
 		default:
 			log.Printf("Coin price for %s/%s is not a float or numeric type, got: %v", first, second, rawCoinPrice)
