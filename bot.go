@@ -142,7 +142,6 @@ func getQuoteFormat(comparisonCurrency string, ticker string, coinQuoteResponse 
 	if symbol == "" {
 		symbol = comparisonCurrency
 	}
-	log.Println(symbol + " - " + comparisonCurrency)
 	return fmt.Sprintf(quoteMessage, ticker, symbol, coinPrice), nil
 }
 
