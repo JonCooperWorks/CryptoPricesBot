@@ -65,7 +65,7 @@ const (
 	COINCAP_UNAVAILABLE_MESSAGE          = "I'm having trouble reaching https://coincap.io. Try again later."
 	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s' on https://coincap.io"
 	SHAPESHIFT_UNAVAILABLE_MESSAGE       = "I'm having trouble contacting https://shapeshift.io. Try again later."
-	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "I can't find %s/%s at either https://coincap.io or https://shapeshift.io."
+	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "Error looking up %s/%s on https://shapeshift.io.\n%s"
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -174,13 +174,12 @@ func NewQuote(first, second string) (*Quote, error) {
 		log.Printf("Contacting https://shapeshift.io for %s", pair.Name)
 		info, err := pair.GetInfo()
 		if err != nil {
-			log.Println(err.Error())
 			return nil, errors.New(SHAPESHIFT_UNAVAILABLE_MESSAGE)
 		}
 
 		if info.ErrorMsg() != "" {
 			log.Println(info.ErrorMsg())
-			return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE, first, second))
+			return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE, first, second, info.ErrorMsg()))
 		}
 
 		return &Quote{
