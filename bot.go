@@ -110,21 +110,22 @@ func QuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []stri
 }
 
 func isFiatInvolved(first, second string) bool {
-	return FIAT_CURRENCIES[first] != "" || FIAT_CURRENCIES[second] != ""
+	return isFiat(first) || isFiat(second)
 }
-
-func coinCapCurrency(first, second string) string {
-	var currency = first
-	if FIAT_CURRENCIES[first] != "" {
-		currency = second
-	}
-	return currency
+func isFiat(ticker string) bool {
+	return FIAT_CURRENCIES[ticker] != ""
 }
 
 func NewQuote(first, second string) (*Quote, error) {
 	log.Printf("Looking up %s/%s", first, second)
 	if isFiatInvolved(first, second) {
-		url := fmt.Sprintf(PRICE_API_ENDPOINT, first)
+		var url string
+		if isFiat(first) {
+			url = fmt.Sprintf(PRICE_API_ENDPOINT, second)
+		} else {
+			url = fmt.Sprintf(PRICE_API_ENDPOINT, first)
+		}
+
 		log.Printf("Looking up price at %s", url)
 		response, err := http.Get(url)
 		if err != nil {
@@ -142,12 +143,22 @@ func NewQuote(first, second string) (*Quote, error) {
 		}
 
 		var coinPrice float64
-		rawCoinPrice := coinQuoteResponse[FIAT_CURRENCIES[second]]
+		var rawCoinPrice interface{}
+		if isFiat(first) {
+			rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[first]]
+		} else {
+			rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[second]]
+		}
+
 		switch rawCoinPrice.(type) {
 		case float64, float32:
-			coinPrice = rawCoinPrice.(float64)
+			if isFiat(second) {
+				coinPrice = rawCoinPrice.(float64)
+			} else {
+				coinPrice = 1 / rawCoinPrice.(float64)
+			}
 		default:
-			log.Printf("Coin price for %s/%s is not a float or numeric type.", first, second)
+			log.Printf("Coin price for %s/%s is not a float or numeric type, got: %v", first, second, rawCoinPrice)
 			return nil, errors.New(
 				fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first),
 			)
