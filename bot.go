@@ -46,20 +46,21 @@ var (
 	}
 
 	SYMBOLS = map[string]string{
-		"USD": "$",
+		"USD": "USD$",
 		"EUR": "€",
 		"LTC": " Ł",
 		"ETH": "Ξ",
-		"BTC": "₿",
+		"BTC": "฿",
 		"ZEC": "ZEC",
 	}
 )
 
 /* Messages */
-var (
+const (
 	WELCOME_MESSAGE string = "Ask me for prices with /quote (ticker). Example: /quote BTC"
 	HELP_MESSAGE    string = "Use me to get prices from https://coincap.io. Just type /quote (Ticker Symbol). For " +
-		"example, /quote BTC or /quote BTC EUR"
+		"example, /quote BTC or /quote BTC EUR.\n" +
+		"Supported currencies: USD, EUR, BTC, LTC, ETH, ZEC"
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -109,29 +110,37 @@ func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 		return
 	}
 
-	quoteMessage := getQuoteFormat(comparisonCurrency, ticker, coinQuoteResponse)
+	quoteMessage, err := getQuoteFormat(comparisonCurrency, ticker, coinQuoteResponse)
+	if err != nil {
+		log.Println(err.Error())
+		Help(bot, update, []string{})
+	}
 	reply(bot, update, quoteMessage)
 
 }
 
-func getQuoteFormat(comparisonCurrency string, ticker string, coinQuoteResponse map[string]interface{}) string {
+func getQuoteFormat(comparisonCurrency string, ticker string, coinQuoteResponse map[string]interface{}) (string, error) {
 	propertyName := CURRENCIES[comparisonCurrency]
 	if propertyName == "" {
-		propertyName = "price_usd"
+		return "", errors.New("Invalid currency passed: " + comparisonCurrency)
 	}
 	coinPrice := coinQuoteResponse[propertyName]
 	var quoteMessage string
 	switch coinPrice.(type) {
 	case float64, float32:
 		if coinPrice.(float64) < 0.99 {
-			quoteMessage = "1 %s = %s%s%.8f"
+			quoteMessage = "1 %s = %s%.8f"
 		} else {
 			quoteMessage = "1 %s = %s%.2f"
 		}
 	}
 
 	symbol := SYMBOLS[comparisonCurrency]
-	return fmt.Sprintf(quoteMessage, ticker, symbol, coinPrice)
+	if symbol == "" {
+		symbol = comparisonCurrency
+	}
+	log.Println(symbol + " - " + comparisonCurrency)
+	return fmt.Sprintf(quoteMessage, ticker, symbol, coinPrice), nil
 }
 
 func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
