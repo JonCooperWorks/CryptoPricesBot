@@ -46,7 +46,7 @@ var (
 	}
 
 	SYMBOLS = map[string]string{
-		"USD": "USD$",
+		"USD": "US$",
 		"EUR": "€",
 		"LTC": " Ł",
 		"ETH": "Ξ",
@@ -57,10 +57,13 @@ var (
 
 /* Messages */
 const (
-	WELCOME_MESSAGE string = "Ask me for prices with /quote (ticker). Example: /quote BTC"
-	HELP_MESSAGE    string = "Use me to get prices from https://coincap.io. Just type /quote (Ticker Symbol). For " +
-		"example, /quote BTC or /quote BTC EUR.\n" +
+	WELCOME_MESSAGE string = "Ask me for prices with /quote (ticker). Example: /quote BTC or /quote BTC EUR"
+	HELP_MESSAGE    string = "Use me to get prices from https://coincap.io. Just type /quote (Ticker Symbol).\n" +
+		"For example, /quote BTC or /quote BTC EUR.\n" +
 		"Supported currencies: USD, EUR, BTC, LTC, ETH, ZEC"
+	COINCAP_BAD_RESPONSE_MESSAGE = "I can't read the response from https://coincap.io for '%s'"
+	COIN_NOT_FOUND_MESSAGE = "I can't find '%s' on https://coincap.io"
+	COINCAP_UNAVAILABLE_MESSAGE = "I'm having trouble reaching https://coincap.io. Try again later."
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -94,19 +97,19 @@ func Quote(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 	url := fmt.Sprintf(PRICE_API_ENDPOINT, ticker)
 	response, err := http.Get(url)
 	if err != nil || response.StatusCode != 200 {
-		reply(bot, update, fmt.Sprintf("Error retreiving %s price", ticker))
+		reply(bot, update, COINCAP_UNAVAILABLE_MESSAGE)
 		return
 	}
 
 	if response.ContentLength == 2 {
-		reply(bot, update, fmt.Sprintf("%s is not on https://coincap.io", ticker))
+		reply(bot, update, fmt.Sprintf(COIN_NOT_FOUND_MESSAGE, ticker))
 		return
 	}
 	var coinQuoteResponse map[string]interface{}
 	err = json.NewDecoder(response.Body).Decode(&coinQuoteResponse)
 	if err != nil {
 		log.Println(err.Error())
-		reply(bot, update, fmt.Sprintf("Error decoding response for %s", ticker))
+		reply(bot, update, fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, ticker))
 		return
 	}
 
@@ -128,7 +131,7 @@ func getQuoteFormat(comparisonCurrency string, ticker string, coinQuoteResponse 
 	var quoteMessage string
 	switch coinPrice.(type) {
 	case float64, float32:
-		if coinPrice.(float64) < 0.99 {
+		if coinPrice.(float64) < 1.00 {
 			quoteMessage = "1 %s = %s%.8f"
 		} else {
 			quoteMessage = "1 %s = %s%.2f"
@@ -152,6 +155,7 @@ func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
 func routeCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	command, err := parseCommandFromUpdate(update)
 	if err != nil {
+		log.Println(err.Error())
 		Help(bot, update, []string{})
 		return
 	}
@@ -159,18 +163,17 @@ func routeCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 }
 
 func parseCommandFromUpdate(update tgbotapi.Update) (*Command, error) {
-	if !update.Message.IsCommand() {
-		arguments := parseArgumentsFromUpdate(update.Message.Text)
-		return &Command{
-			Controller: Quote,
-			Arguments:  arguments,
-		}, nil
-	}
-
 	log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 	parts := parseArgumentsFromUpdate(update.Message.Text)
 	if len(parts) < 1 {
-		return nil, errors.New(HELP_MESSAGE)
+		return nil, errors.New(fmt.Sprintf("Error parsing arguments from %s", update.Message.Text))
+	}
+
+	if !update.Message.IsCommand() {
+		return &Command{
+			Controller: Quote,
+			Arguments:  parts,
+		}, nil
 	}
 
 	controllerName := parts[0]
@@ -180,7 +183,7 @@ func parseCommandFromUpdate(update tgbotapi.Update) (*Command, error) {
 
 	controller := controllers[controllerName]
 	if controller == nil {
-		return nil, errors.New(HELP_MESSAGE)
+		return nil, errors.New(fmt.Sprintf("Controller '%s' not found", controllerName))
 	}
 
 	return &Command{
@@ -198,7 +201,7 @@ func main() {
 		log.Panic(err)
 	}
 
-	bot.Debug = true
+	bot.Debug = os.Getenv("DEBUG") != ""
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
@@ -206,7 +209,6 @@ func main() {
 	u.Timeout = 60
 
 	updates, err := bot.GetUpdatesChan(u)
-
 	for update := range updates {
 		if update.Message == nil {
 			continue
