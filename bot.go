@@ -11,9 +11,9 @@ import (
 
 	"github.com/hunterlong/shapeshift"
 	"gopkg.in/telegram-bot-api.v4"
+	"math"
 	"runtime"
 	"strconv"
-	"math"
 )
 
 /* Web Services config */
@@ -29,6 +29,7 @@ const (
 	START_COMMAND   = "/start"
 	HELP_COMMAND    = "/help"
 	CONVERT_COMMAND = "/convert"
+	SOURCE_COMMAND = "/source"
 )
 
 /* Controller routing table */
@@ -38,6 +39,7 @@ var (
 		QUOTE_COMMAND:   QuoteCommand,
 		HELP_COMMAND:    HelpCommand,
 		CONVERT_COMMAND: ConvertCommand,
+		SOURCE_COMMAND: SourceCommand,
 	}
 )
 
@@ -63,7 +65,7 @@ const (
 	WELCOME_MESSAGE = "Ask me for prices with /quote (ticker).\n" +
 		"Example: /quote BTC or /quote BTC EUR.\n" +
 		"You can also convert specific amounts with /convert (amount) (from) (to).\n" +
-		"Example: /convert 100 BTC USD"
+		"Example: /convert 100 BTC USD."
 	HELP_MESSAGE = "Use me to get prices from https://coincap.io and https://shapeshift.io.\n" +
 		"Just type /quote (First Symbol).\n" +
 		"For example, /quote BTC or /quote BTC EUR.\n" +
@@ -72,9 +74,12 @@ const (
 		"Supported currencies: USD, EUR and all cryptocurrency pairs on https://shapeshift.io."
 	COINCAP_BAD_RESPONSE_MESSAGE         = "I can't read the response from https://coincap.io for '%s/%s.'"
 	COINCAP_UNAVAILABLE_MESSAGE          = "I'm having trouble reaching https://coincap.io. Try again later."
-	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s/%s' on https://coincap.io"
+	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s/%s' on https://coincap.io."
 	SHAPESHIFT_UNAVAILABLE_MESSAGE       = "I'm having trouble contacting https://shapeshift.io. Try again later."
 	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "Error looking up %s/%s on https://shapeshift.io.\n%s"
+	SOURCE_MESSAGE                       = "You can find my source code here: "+
+		"https://github.com/JonCooperWorks/CryptoPricesBot.\n" +
+		"My code is licensed GPLv3, so you're free to use and modify it if you open source your modifications."
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -95,6 +100,10 @@ func StartCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []stri
 
 func HelpCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 	reply(bot, update, HELP_MESSAGE)
+}
+
+func SourceCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
+	reply(bot, update, SOURCE_MESSAGE)
 }
 
 func ConvertCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
