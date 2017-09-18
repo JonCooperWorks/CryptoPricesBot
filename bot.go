@@ -12,6 +12,8 @@ import (
 	"github.com/hunterlong/shapeshift"
 	"gopkg.in/telegram-bot-api.v4"
 	"runtime"
+	"strconv"
+	"math"
 )
 
 /* Web Services config */
@@ -23,17 +25,19 @@ const (
 
 /* Commands */
 const (
-	QUOTE_COMMAND = "/quote"
-	START_COMMAND = "/start"
-	HELP_COMMAND  = "/help"
+	QUOTE_COMMAND   = "/quote"
+	START_COMMAND   = "/start"
+	HELP_COMMAND    = "/help"
+	CONVERT_COMMAND = "/convert"
 )
 
 /* Controller routing table */
 var (
 	controllers = map[string]Controller{
-		START_COMMAND: StartCommand,
-		QUOTE_COMMAND: QuoteCommand,
-		HELP_COMMAND:  HelpCommand,
+		START_COMMAND:   StartCommand,
+		QUOTE_COMMAND:   QuoteCommand,
+		HELP_COMMAND:    HelpCommand,
+		CONVERT_COMMAND: ConvertCommand,
 	}
 )
 
@@ -56,10 +60,15 @@ var (
 
 /* Messages */
 const (
-	WELCOME_MESSAGE = "Ask me for prices with /quote (ticker). Example: /quote BTC or /quote BTC EUR."
-	HELP_MESSAGE    = "Use me to get prices from https://coincap.io and https://shapeshift.io.\n" +
+	WELCOME_MESSAGE = "Ask me for prices with /quote (ticker).\n" +
+		"Example: /quote BTC or /quote BTC EUR.\n" +
+		"You can also convert specific amounts with /convert (amount) (from) (to).\n" +
+		"Example: /convert 100 BTC USD"
+	HELP_MESSAGE = "Use me to get prices from https://coincap.io and https://shapeshift.io.\n" +
 		"Just type /quote (First Symbol).\n" +
 		"For example, /quote BTC or /quote BTC EUR.\n" +
+		"To convert a specific amount, use the convert command.\n" +
+		"For example, /convert 100 USD BTC.\n" +
 		"Supported currencies: USD, EUR and all cryptocurrency pairs on https://shapeshift.io."
 	COINCAP_BAD_RESPONSE_MESSAGE         = "I can't read the response from https://coincap.io for '%s.'"
 	COINCAP_UNAVAILABLE_MESSAGE          = "I'm having trouble reaching https://coincap.io. Try again later."
@@ -77,6 +86,7 @@ type Quote struct {
 	Second string
 	First  string
 	Price  float64
+	Amount float64
 }
 
 func StartCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
@@ -87,6 +97,28 @@ func HelpCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []strin
 	reply(bot, update, HELP_MESSAGE)
 }
 
+func ConvertCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
+	if len(arguments) != 3 {
+		HelpCommand(bot, update, arguments)
+		return
+	}
+	amount, err := strconv.ParseFloat(arguments[0], 64)
+	if err != nil {
+		log.Println(err.Error())
+		HelpCommand(bot, update, arguments)
+		return
+	}
+	first := strings.ToUpper(arguments[1])
+	second := strings.ToUpper(arguments[2])
+	quote, err := NewQuote(first, second, amount)
+	if err != nil {
+		reply(bot, update, err.Error())
+		return
+	}
+
+	reply(bot, update, quote.String())
+}
+
 func QuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 	if len(arguments) < 1 {
 		HelpCommand(bot, update, arguments)
@@ -94,14 +126,14 @@ func QuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []stri
 	}
 
 	first := strings.ToUpper(arguments[0])
-	var comparisonCurrency string
+	var second string
 	if len(arguments) == 2 {
-		comparisonCurrency = strings.ToUpper(arguments[1])
+		second = strings.ToUpper(arguments[1])
 	} else {
-		comparisonCurrency = "USD"
+		second = "USD"
 	}
 
-	quote, err := NewQuote(first, comparisonCurrency)
+	quote, err := NewQuote(first, second, 1)
 	if err != nil {
 		reply(bot, update, err.Error())
 		return
@@ -116,8 +148,9 @@ func isFiat(ticker string) bool {
 	return FIAT_CURRENCIES[ticker] != ""
 }
 
-func NewQuote(first, second string) (*Quote, error) {
+func NewQuote(first, second string, amount float64) (*Quote, error) {
 	log.Printf("Looking up %s/%s", first, second)
+	var coinPrice float64
 	if isFiatInvolved(first, second) {
 		var url string
 		if isFiat(first) {
@@ -141,8 +174,6 @@ func NewQuote(first, second string) (*Quote, error) {
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first))
 		}
-
-		var coinPrice float64
 		var rawCoinPrice interface{}
 		if isFiat(first) {
 			rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[first]]
@@ -164,11 +195,6 @@ func NewQuote(first, second string) (*Quote, error) {
 				fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first),
 			)
 		}
-		return &Quote{
-			First:  first,
-			Second: second,
-			Price:  coinPrice,
-		}, nil
 	} else {
 		pair := shapeshift.Pair{Name: fmt.Sprintf("%s_%s", first, second)}
 		log.Printf("Contacting https://shapeshift.io for %s", pair.Name)
@@ -182,26 +208,37 @@ func NewQuote(first, second string) (*Quote, error) {
 			return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE, first, second, info.ErrorMsg()))
 		}
 
-		return &Quote{
-			Second: second,
-			First:  first,
-			Price:  info.Rate,
-		}, nil
+		coinPrice = info.Rate
 	}
+	return &Quote{
+		First:  first,
+		Second: second,
+		Price:  coinPrice,
+		Amount: amount,
+	}, nil
 }
 
 func (quote *Quote) String() string {
 	var quoteMessage string
-	if quote.Price < 1.00 {
-		quoteMessage = "1 %s = %s%.8f"
+	cost := quote.Price * quote.Amount
+	if quote.Amount < 1 {
+		quoteMessage = "%.8f %s = "
+	} else if math.Mod(quote.Amount, 1) == 0 {
+		quoteMessage = "%.0f %s = "
 	} else {
-		quoteMessage = "1 %s = %s%.2f"
+		quoteMessage = "%.2f %s = "
+	}
+
+	if cost < 1 {
+		quoteMessage += "%s%.8f"
+	} else {
+		quoteMessage += "%s%.2f"
 	}
 	symbol := SYMBOLS[quote.Second]
 	if symbol == "" {
 		symbol = quote.Second
 	}
-	return fmt.Sprintf(quoteMessage, quote.First, symbol, quote.Price)
+	return fmt.Sprintf(quoteMessage, quote.Amount, quote.First, symbol, cost)
 }
 
 func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
@@ -283,10 +320,9 @@ func main() {
 	}
 
 	// Goroutine pool for processing messages.
-	for i := 0; i < runtime.NumCPU() - 1; i++ {
+	for i := 0; i < runtime.NumCPU()-1; i++ {
 		go worker(updates, bot)
 	}
 	// Block on the main thread so we don't exit
 	worker(updates, bot)
 }
-
