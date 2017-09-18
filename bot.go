@@ -83,6 +83,7 @@ const (
 	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s/%s' on https://coincap.io."
 	SHAPESHIFT_UNAVAILABLE_MESSAGE       = "I'm having trouble contacting https://shapeshift.io. Try again later."
 	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "Error looking up %s/%s on https://shapeshift.io.\n%s"
+	CONVERT_AMOUNT_NUMERIC_MESSAGE = "Only numbers can be used with /convert.\nDo not use a currency symbol."
 	SOURCE_MESSAGE                       = "You can find my source code here: " +
 		"https://github.com/JonCooperWorks/CryptoPricesBot.\n" +
 		"My code is licensed GPLv3, so you're free to use and modify it if you open source your modifications."
@@ -120,7 +121,7 @@ func ConvertCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []st
 	amount, err := strconv.ParseFloat(arguments[0], 64)
 	if err != nil {
 		log.Println(err.Error())
-		HelpCommand(bot, update, arguments)
+		reply(bot, update, CONVERT_AMOUNT_NUMERIC_MESSAGE)
 		return
 	}
 	first := strings.ToUpper(arguments[1])
