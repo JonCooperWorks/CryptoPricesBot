@@ -280,7 +280,7 @@ func NewCommand(update tgbotapi.Update) (*Command, error) {
 		}, nil
 	}
 
-	controllerName := parts[0]
+	controllerName := strings.ToLower(parts[0])
 	if strings.Contains(controllerName, BOT_NAME) {
 		controllerName = strings.Split(controllerName, USERNAME_SEPARATOR)[0]
 	}
