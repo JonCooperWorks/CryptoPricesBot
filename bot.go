@@ -53,10 +53,9 @@ var (
 	SYMBOLS = map[string]string{
 		"USD": "US$",
 		"EUR": "€",
-		"LTC": " Ł",
+		"LTC": "Ł",
 		"ETH": "Ξ",
 		"BTC": "฿",
-		"ZEC": "ZEC ",
 	}
 )
 
