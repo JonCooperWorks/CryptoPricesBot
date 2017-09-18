@@ -70,9 +70,9 @@ const (
 		"To convert a specific amount, use the convert command.\n" +
 		"For example, /convert 100 USD BTC.\n" +
 		"Supported currencies: USD, EUR and all cryptocurrency pairs on https://shapeshift.io."
-	COINCAP_BAD_RESPONSE_MESSAGE         = "I can't read the response from https://coincap.io for '%s.'"
+	COINCAP_BAD_RESPONSE_MESSAGE         = "I can't read the response from https://coincap.io for '%s/%s.'"
 	COINCAP_UNAVAILABLE_MESSAGE          = "I'm having trouble reaching https://coincap.io. Try again later."
-	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s' on https://coincap.io"
+	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s/%s' on https://coincap.io"
 	SHAPESHIFT_UNAVAILABLE_MESSAGE       = "I'm having trouble contacting https://shapeshift.io. Try again later."
 	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "Error looking up %s/%s on https://shapeshift.io.\n%s"
 )
@@ -166,13 +166,13 @@ func NewQuote(first, second string, amount float64) (*Quote, error) {
 		}
 
 		if response.ContentLength == 2 {
-			return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_COINCAP_MESSAGE, first))
+			return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_COINCAP_MESSAGE, first, second))
 		}
 
 		var coinQuoteResponse map[string]interface{}
 		err = json.NewDecoder(response.Body).Decode(&coinQuoteResponse)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first))
+			return nil, errors.New(fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second))
 		}
 		var rawCoinPrice interface{}
 		if isFiat(first) {
@@ -192,7 +192,7 @@ func NewQuote(first, second string, amount float64) (*Quote, error) {
 		default:
 			log.Printf("Coin price for %s/%s is not a float or numeric type, got: %v", first, second, rawCoinPrice)
 			return nil, errors.New(
-				fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first),
+				fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second),
 			)
 		}
 	} else {
