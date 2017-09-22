@@ -5,41 +5,47 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"os"
-	"strings"
-
-	"github.com/hunterlong/shapeshift"
-	"gopkg.in/telegram-bot-api.v4"
-	"math"
 	"runtime"
 	"strconv"
+	"strings"
+
+	"github.com/patrickmn/go-cache"
+	"github.com/PuerkitoBio/goquery"
+	"github.com/hunterlong/shapeshift"
+	"gopkg.in/telegram-bot-api.v4"
+	"time"
 )
 
 /* Web Services config */
 const (
-	PRICE_API_ENDPOINT = "https://coincap.io/page/%s"
-	USERNAME_SEPARATOR = "@"
-	BOT_NAME           = USERNAME_SEPARATOR + "coincap_prices_bot"
+	CRYPTO_PRICE_API_ENDPOINT   = "https://coincap.io/page/%s"
+	JSE_PRICE_SCRAPING_ENDPOINT = "https://www.jamstockex.com/market-data/combined-market/summary/"
+	USERNAME_SEPARATOR          = "@"
+	BOT_NAME                    = USERNAME_SEPARATOR + "coincap_prices_bot"
 )
 
 /* Commands */
 const (
-	QUOTE_COMMAND   = "/quote"
-	START_COMMAND   = "/start"
-	HELP_COMMAND    = "/help"
-	CONVERT_COMMAND = "/convert"
-	SOURCE_COMMAND  = "/source"
+	QUOTE_COMMAND     = "/quote"
+	START_COMMAND     = "/start"
+	HELP_COMMAND      = "/help"
+	CONVERT_COMMAND   = "/convert"
+	SOURCE_COMMAND    = "/source"
+	JSE_QUOTE_COMMAND = "/wahgwaanfi"
 )
 
 /* Controller routing table */
 var (
 	controllers = map[string]Controller{
-		START_COMMAND:   StartCommand,
-		QUOTE_COMMAND:   QuoteCommand,
-		HELP_COMMAND:    HelpCommand,
-		CONVERT_COMMAND: ConvertCommand,
-		SOURCE_COMMAND:  SourceCommand,
+		START_COMMAND:     StartCommand,
+		QUOTE_COMMAND:     QuoteCommand,
+		HELP_COMMAND:      HelpCommand,
+		CONVERT_COMMAND:   ConvertCommand,
+		SOURCE_COMMAND:    SourceCommand,
+		JSE_QUOTE_COMMAND: JseQuoteCommand,
 	}
 )
 
@@ -63,10 +69,11 @@ var (
 		"STEEM": "ȿ",
 		"DOGE":  "Ð",
 		"ZEC":   "ⓩ",
+		"JMD":   "J$",
 	}
 )
 
-/* Messages */
+/* Crypto Messages */
 const (
 	WELCOME_MESSAGE = "Ask me for prices with /quote (ticker).\n" +
 		"Example: /quote BTC or /quote BTC EUR.\n" +
@@ -90,16 +97,54 @@ const (
 		"My code is licensed GPLv3, so you're free to use and modify it if you open source your modifications."
 )
 
+/* JSE Messages */
+const (
+	JSE_UNAVAILABLE_MESSAGE = "I can't read the response from the JSE website.\n" +
+		"Try again later or ask me about a cryptocurrency.\n" +
+		"https://twitter.com/jastockex?lang=en"
+	JSE_STOCK_NOT_FOUND_MESSAGE = "I can't find %s on the JSE."
+)
+
+/* JSE Cache */
+var (
+	JSE_CACHE = cache.New(30 * time.Minute, 1 * time.Hour)
+)
+
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
+
 type Command struct {
 	Controller Controller
 	Arguments  []string
 }
+
 type Quote struct {
 	Second string
 	First  string
 	Price  float64
 	Amount float64
+}
+
+func (quote *Quote) String() string {
+	var quoteMessage string
+	cost := quote.Price * quote.Amount
+	if quote.Amount < 1 {
+		quoteMessage = "%.8f %s = "
+	} else if math.Mod(quote.Amount, 1) == 0 {
+		quoteMessage = "%.0f %s = "
+	} else {
+		quoteMessage = "%.2f %s = "
+	}
+
+	if cost < 1 {
+		quoteMessage += "%s%.8f"
+	} else {
+		quoteMessage += "%s%.2f"
+	}
+	symbol := SYMBOLS[quote.Second]
+	if symbol == "" {
+		symbol = quote.Second
+	}
+	return fmt.Sprintf(quoteMessage, quote.Amount, quote.First, symbol, cost)
 }
 
 func StartCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
@@ -127,7 +172,7 @@ func ConvertCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []st
 	}
 	first := strings.ToUpper(arguments[1])
 	second := strings.ToUpper(arguments[2])
-	quote, err := NewQuote(first, second, amount)
+	quote, err := NewCryptoQuote(first, second, amount)
 	if err != nil {
 		reply(bot, update, err.Error())
 		return
@@ -150,12 +195,90 @@ func QuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []stri
 		second = "USD"
 	}
 
-	quote, err := NewQuote(first, second, 1)
+	quote, err := NewCryptoQuote(first, second, 1)
 	if err != nil {
 		reply(bot, update, err.Error())
 		return
 	}
 	reply(bot, update, quote.String())
+}
+
+func JseQuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
+	if len(arguments) < 1 {
+		HelpCommand(bot, update, arguments)
+		return
+	}
+
+	// JMD only for now.
+	first := strings.ToUpper(arguments[0])
+	var second = "JMD"
+	quote, err := NewJseQuote(first, second, 1)
+	if err != nil {
+		reply(bot, update, err.Error())
+		return
+	}
+
+	reply(bot, update, quote.String())
+
+}
+
+func scrapeJseWebsite(ticker string) (float64, error) {
+	resp, err := http.Get(JSE_PRICE_SCRAPING_ENDPOINT)
+	if err != nil || resp.StatusCode != 200 {
+		log.Println("Patty dem run out.")
+		return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
+	}
+	document, err := goquery.NewDocumentFromResponse(resp)
+	if err != nil {
+		log.Println(err.Error())
+		return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
+	}
+
+	// Get all the table rows and loop through them
+	document.Find("table tbody tr").Each(func(i int, s *goquery.Selection) {
+		// For each row, pull out the ticker and price
+		uriContainingTicker, exists := s.Find("td a").Attr("href")
+		if !exists {
+			log.Println("No URL found")
+			return
+		}
+		ticker := strings.TrimSpace(strings.Split(uriContainingTicker, "/")[4])
+		ticker = strings.ToUpper(ticker)
+		priceText := s.Find("td").Eq(2).Text()
+		price, err := strconv.ParseFloat(strings.TrimSpace(priceText), 64)
+		if err != nil {
+			log.Println(err.Error())
+			return
+		}
+
+		JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)
+		log.Printf("%s: %.2f", ticker, price)
+	})
+
+	price, found := JSE_CACHE.Get(ticker)
+	if !found {
+		return 0, errors.New(fmt.Sprintf(JSE_STOCK_NOT_FOUND_MESSAGE, ticker))
+	}
+	return price.(float64), nil
+}
+
+func NewJseQuote(first, second string, amount float64) (*Quote, error) {
+	// Return prices from cache
+	var price interface{}
+	var err error
+	price, found := JSE_CACHE.Get(first)
+	if !found {
+		price, err = scrapeJseWebsite(first)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &Quote{
+		First:first,
+		Second:second,
+		Amount:amount,
+		Price:price.(float64),
+	}, nil
 }
 
 func isFiatInvolved(first, second string) bool {
@@ -165,15 +288,15 @@ func isFiat(ticker string) bool {
 	return FIAT_CURRENCIES[ticker] != ""
 }
 
-func NewQuote(first, second string, amount float64) (*Quote, error) {
+func NewCryptoQuote(first, second string, amount float64) (*Quote, error) {
 	log.Printf("Looking up %s/%s", first, second)
 	var coinPrice float64
 	if isFiatInvolved(first, second) {
 		var url string
 		if isFiat(first) {
-			url = fmt.Sprintf(PRICE_API_ENDPOINT, second)
+			url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, second)
 		} else {
-			url = fmt.Sprintf(PRICE_API_ENDPOINT, first)
+			url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, first)
 		}
 
 		log.Printf("Looking up price at %s", url)
@@ -233,29 +356,6 @@ func NewQuote(first, second string, amount float64) (*Quote, error) {
 		Price:  coinPrice,
 		Amount: amount,
 	}, nil
-}
-
-func (quote *Quote) String() string {
-	var quoteMessage string
-	cost := quote.Price * quote.Amount
-	if quote.Amount < 1 {
-		quoteMessage = "%.8f %s = "
-	} else if math.Mod(quote.Amount, 1) == 0 {
-		quoteMessage = "%.0f %s = "
-	} else {
-		quoteMessage = "%.2f %s = "
-	}
-
-	if cost < 1 {
-		quoteMessage += "%s%.8f"
-	} else {
-		quoteMessage += "%s%.2f"
-	}
-	symbol := SYMBOLS[quote.Second]
-	if symbol == "" {
-		symbol = quote.Second
-	}
-	return fmt.Sprintf(quoteMessage, quote.Amount, quote.First, symbol, cost)
 }
 
 func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
