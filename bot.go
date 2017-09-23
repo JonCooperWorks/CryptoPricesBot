@@ -78,13 +78,18 @@ const (
 	WELCOME_MESSAGE = "Ask me for prices with /quote (ticker).\n" +
 		"Example: /quote BTC or /quote BTC EUR.\n" +
 		"You can also convert specific amounts with /convert (amount) (from) (to).\n" +
-		"Example: /convert 100 BTC USD."
+		"Example: /convert 100 BTC USD.\n" +
+		"I can also tell you wah gwaan fi a stock on the Jamaica Stock Exchange " +
+		"(http://jamstockex.com/market-data/combined-market/summary/)\n" +
+		"Example: /wahgwaanfi NCBFG"
 	HELP_MESSAGE = "Use me to get prices from https://coincap.io and https://shapeshift.io.\n" +
 		"Just type /quote (First Symbol).\n" +
 		"For example, /quote BTC or /quote BTC EUR.\n" +
 		"To convert a specific amount, use the convert command.\n" +
 		"For example, /convert 100 USD BTC.\n" +
-		"Supported currencies: USD, EUR and all cryptocurrency pairs on https://shapeshift.io."
+		"Supported currencies for cryptocurrency lookups: USD, EUR and all cryptocurrency pairs on https://shapeshift.io.\n" +
+		"I can also tell you wah gwaan fi stocks on the Jamaica Stock Exchange." +
+		"For example, /wahgwaanfi NCBFG"
 	COINCAP_BAD_RESPONSE_MESSAGE         = "I can't read the response from https://coincap.io for '%s/%s.'"
 	COINCAP_UNAVAILABLE_MESSAGE          = "I'm having trouble reaching https://coincap.io. Try again later."
 	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s/%s' on https://coincap.io."
