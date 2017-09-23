@@ -107,6 +107,7 @@ const (
 
 /* JSE Cache */
 var (
+	// TODO: Expire next day at 2PM
 	JSE_CACHE = cache.New(30*time.Minute, 1*time.Hour)
 )
 
@@ -224,6 +225,7 @@ func JseQuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []s
 
 func scrapeJseWebsite(ticker string) (float64, error) {
 	resp, err := http.Get(JSE_PRICE_SCRAPING_ENDPOINT)
+	log.Printf("Looking up %s on the JSE", ticker)
 	if err != nil || resp.StatusCode != 200 {
 		log.Println("Patty dem run out.")
 		return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
