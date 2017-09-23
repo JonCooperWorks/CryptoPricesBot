@@ -251,7 +251,7 @@ func scrapeJseWebsite(ticker string) (float64, error) {
 			return
 		}
 
-		JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)g
+		JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)
 	})
 
 	price, found := JSE_CACHE.Get(ticker)
