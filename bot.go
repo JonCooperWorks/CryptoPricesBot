@@ -88,7 +88,7 @@ const (
 		"To convert a specific amount, use the convert command.\n" +
 		"For example, /convert 100 USD BTC.\n" +
 		"Supported currencies for cryptocurrency lookups: USD, EUR and all cryptocurrency pairs on https://shapeshift.io.\n" +
-		"I can also tell you wah gwaan fi stocks on the Jamaica Stock Exchange." +
+		"I can also tell you wah gwaan fi stocks on the Jamaica Stock Exchange.\n" +
 		"For example, /wahgwaanfi NCBFG"
 	COINCAP_BAD_RESPONSE_MESSAGE         = "I can't read the response from https://coincap.io for '%s/%s.'"
 	COINCAP_UNAVAILABLE_MESSAGE          = "I'm having trouble reaching https://coincap.io. Try again later."
