@@ -11,12 +11,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/patrickmn/go-cache"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/hunterlong/shapeshift"
+	"github.com/patrickmn/go-cache"
 	"gopkg.in/telegram-bot-api.v4"
-	"time"
 )
 
 /* Web Services config */
@@ -107,7 +107,7 @@ const (
 
 /* JSE Cache */
 var (
-	JSE_CACHE = cache.New(30 * time.Minute, 1 * time.Hour)
+	JSE_CACHE = cache.New(30*time.Minute, 1*time.Hour)
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -273,10 +273,10 @@ func NewJseQuote(first, second string, amount float64) (*Quote, error) {
 		}
 	}
 	return &Quote{
-		First:first,
-		Second:second,
-		Amount:amount,
-		Price:price.(float64),
+		First:  first,
+		Second: second,
+		Amount: amount,
+		Price:  price.(float64),
 	}, nil
 }
 
