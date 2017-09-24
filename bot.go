@@ -248,16 +248,16 @@ func scrapeJseWebsite(ticker string) (float64, error) {
 		}
 
 		// Get all the table rows and loop through them
-		document.Find("table tbody tr").Each(func(i int, s *goquery.Selection) {
+		document.Find("table tbody tr").Each(func(row int, selection *goquery.Selection) {
 			// For each row, pull out the ticker and price
-			uriContainingTicker, exists := s.Find("td a").Attr("href")
+			uriContainingTicker, exists := selection.Find("td a").Attr("href")
 			if !exists {
-				log.Println("No URL found")
+				log.Printf("No URL found at row %d on table.", row)
 				return
 			}
 			ticker := strings.TrimSpace(strings.Split(uriContainingTicker, "/")[4])
 			ticker = strings.ToUpper(ticker)
-			priceText := s.Find("td").Eq(2).Text()
+			priceText := selection.Find("td").Eq(2).Text()
 			price, err := strconv.ParseFloat(strings.TrimSpace(priceText), 64)
 			if err != nil {
 				log.Println(err.Error())
@@ -448,6 +448,7 @@ func worker(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
 }
 
 func main() {
+	log.SetOutput(os.Stdout)
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_BOT_TOKEN"))
 	if err != nil {
 		log.Fatal(err)
