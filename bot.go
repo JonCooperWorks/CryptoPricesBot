@@ -268,14 +268,13 @@ func scrapeJseWebsite(ticker string) (float64, error) {
 			JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)
 		})
 
-		price, err = scrapeJseWebsite(ticker)
-		if err != nil {
+		rawPrice, found = JSE_CACHE.Get(ticker)
+		if !found {
 			return 0, errors.New(fmt.Sprintf(JSE_STOCK_NOT_FOUND_MESSAGE, ticker))
 		}
-	} else {
-		price = rawPrice.(float64)
 	}
-	return price, nil
+
+	return rawPrice.(float64), nil
 }
 
 func NewJseQuote(first, second string, amount float64) (*Quote, error) {
