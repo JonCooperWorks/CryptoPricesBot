@@ -96,7 +96,7 @@ const (
 	COINCAP_UNAVAILABLE_MESSAGE          = "I'm having trouble reaching https://coincap.io. Try again later."
 	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s/%s' on https://coincap.io."
 	SHAPESHIFT_UNAVAILABLE_MESSAGE       = "I'm having trouble contacting https://shapeshift.io. Try again later."
-	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "Error looking up %s/%s on https://shapeshift.io.\n%s"
+	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "Error looking up '%s/%s' on https://shapeshift.io.\n%s"
 	CONVERT_AMOUNT_NUMERIC_MESSAGE       = "Only numbers can be used with /convert.\n" +
 		"Do not use a currency symbol."
 	SOURCE_MESSAGE = "You can find my source code here: " +
@@ -109,7 +109,7 @@ const (
 	JSE_UNAVAILABLE_MESSAGE = "I can't read the response from the JSE website.\n" +
 		"Try again later or ask me about a cryptocurrency.\n" +
 		"https://twitter.com/jastockex?lang=en"
-	JSE_STOCK_NOT_FOUND_MESSAGE = "I can't find %s on the JSE."
+	JSE_STOCK_NOT_FOUND_MESSAGE = "I can't find '%s' on the JSE."
 )
 
 /* JSE Cache */
@@ -252,7 +252,7 @@ func scrapeJseWebsite(ticker string) (float64, error) {
 			// For each row, pull out the ticker and price
 			uriContainingTicker, exists := selection.Find("td a").Attr("href")
 			if !exists {
-				log.Printf("No URL found at row %d on table.", row)
+				log.Printf("No URL found at row '%d' on table.", row)
 				return
 			}
 			ticker := strings.TrimSpace(strings.Split(uriContainingTicker, "/")[4])
@@ -284,6 +284,7 @@ func NewJseQuote(first, second string, amount float64) (*Quote, error) {
 	if !found {
 		price, err = scrapeJseWebsite(first)
 		if err != nil {
+			log.Printf("Could not find '%s' on the JSE", first)
 			return nil, err
 		}
 	}
@@ -313,7 +314,7 @@ func NewCryptoQuote(first, second string, amount float64) (*Quote, error) {
 func NewShapeShiftQuote(first, second string, amount float64) (*Quote, error) {
 	log.Printf("Looking up %s/%s", first, second)
 	pair := shapeshift.Pair{Name: fmt.Sprintf("%s_%s", first, second)}
-	log.Printf("Contacting https://shapeshift.io for %s", pair.Name)
+	log.Printf("Contacting https://shapeshift.io for '%s'", pair.Name)
 	info, err := pair.GetInfo()
 	if err != nil {
 		return nil, errors.New(SHAPESHIFT_UNAVAILABLE_MESSAGE)
@@ -340,7 +341,7 @@ func NewCoinCapQuote(first, second string, amount float64) (*Quote, error) {
 		url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, first)
 	}
 
-	log.Printf("Looking up price at %s", url)
+	log.Printf("Looking up price at '%s'", url)
 	response, err := http.Get(url)
 	if err != nil {
 		return nil, errors.New(COINCAP_UNAVAILABLE_MESSAGE)
@@ -372,7 +373,7 @@ func NewCoinCapQuote(first, second string, amount float64) (*Quote, error) {
 			coinPrice = 0.993 / rawCoinPrice.(float64)
 		}
 	default:
-		log.Printf("Coin price for %s/%s is not a float or numeric type, got: %v", first, second, rawCoinPrice)
+		log.Printf("Coin price for %s/%s is not a float or numeric type, got: '%v'", first, second, rawCoinPrice)
 		return nil, errors.New(
 			fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second),
 		)
@@ -407,7 +408,7 @@ func NewCommand(update tgbotapi.Update) (*Command, error) {
 	log.Printf("[%s - %s] %s", update.Message.From.UserName, update.Message.From.FirstName, update.Message.Text)
 	parts := parseArgumentsFromUpdate(update.Message.Text)
 	if len(parts) < 1 {
-		return nil, errors.New(fmt.Sprintf("Error parsing arguments from %s", update.Message.Text))
+		return nil, errors.New(fmt.Sprintf("Error parsing arguments from '%s'", update.Message.Text))
 	}
 
 	if !update.Message.IsCommand() {
