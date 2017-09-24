@@ -232,7 +232,6 @@ func JseQuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []s
 }
 
 func scrapeJseWebsite(ticker string) (float64, error) {
-	var price float64
 	rawPrice, found := JSE_CACHE.Get(ticker)
 	if !found {
 
