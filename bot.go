@@ -35,6 +35,7 @@ const (
 	CONVERT_COMMAND   = "/convert"
 	SOURCE_COMMAND    = "/source"
 	JSE_QUOTE_COMMAND = "/wahgwaanfi"
+	ALTERNATIVE_SPELLING_JSE_QUOTE_COMMAND = "/wagwaanfi"
 )
 
 /* Controller routing table */
@@ -46,6 +47,7 @@ var (
 		CONVERT_COMMAND:   ConvertCommand,
 		SOURCE_COMMAND:    SourceCommand,
 		JSE_QUOTE_COMMAND: JseQuoteCommand,
+		ALTERNATIVE_SPELLING_JSE_QUOTE_COMMAND: JseQuoteCommand,
 	}
 )
 
@@ -117,6 +119,7 @@ var (
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
+type QuoteSource func(first, second string, amount float64) (*Quote, error)
 
 type Command struct {
 	Controller Controller
@@ -229,43 +232,50 @@ func JseQuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []s
 }
 
 func scrapeJseWebsite(ticker string) (float64, error) {
-	resp, err := http.Get(JSE_PRICE_SCRAPING_ENDPOINT)
-	log.Printf("Looking up %s on the JSE", ticker)
-	if err != nil || resp.StatusCode != 200 {
-		log.Println("Patty dem run out.")
-		return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
-	}
-	document, err := goquery.NewDocumentFromResponse(resp)
-	if err != nil {
-		log.Println(err.Error())
-		return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
-	}
+	var price float64
+	rawPrice, found := JSE_CACHE.Get(ticker)
+	if !found {
 
-	// Get all the table rows and loop through them
-	document.Find("table tbody tr").Each(func(i int, s *goquery.Selection) {
-		// For each row, pull out the ticker and price
-		uriContainingTicker, exists := s.Find("td a").Attr("href")
-		if !exists {
-			log.Println("No URL found")
-			return
+		resp, err := http.Get(JSE_PRICE_SCRAPING_ENDPOINT)
+		log.Printf("Looking up %s on the JSE", ticker)
+		if err != nil || resp.StatusCode != 200 {
+			log.Println("Patty dem run out.")
+			return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
 		}
-		ticker := strings.TrimSpace(strings.Split(uriContainingTicker, "/")[4])
-		ticker = strings.ToUpper(ticker)
-		priceText := s.Find("td").Eq(2).Text()
-		price, err := strconv.ParseFloat(strings.TrimSpace(priceText), 64)
+		document, err := goquery.NewDocumentFromResponse(resp)
 		if err != nil {
 			log.Println(err.Error())
-			return
+			return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
 		}
 
-		JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)
-	})
+		// Get all the table rows and loop through them
+		document.Find("table tbody tr").Each(func(i int, s *goquery.Selection) {
+			// For each row, pull out the ticker and price
+			uriContainingTicker, exists := s.Find("td a").Attr("href")
+			if !exists {
+				log.Println("No URL found")
+				return
+			}
+			ticker := strings.TrimSpace(strings.Split(uriContainingTicker, "/")[4])
+			ticker = strings.ToUpper(ticker)
+			priceText := s.Find("td").Eq(2).Text()
+			price, err := strconv.ParseFloat(strings.TrimSpace(priceText), 64)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
 
-	price, found := JSE_CACHE.Get(ticker)
-	if !found {
-		return 0, errors.New(fmt.Sprintf(JSE_STOCK_NOT_FOUND_MESSAGE, ticker))
+			JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)
+		})
+
+		price, err = scrapeJseWebsite(ticker)
+		if err != nil {
+			return 0, errors.New(fmt.Sprintf(JSE_STOCK_NOT_FOUND_MESSAGE, ticker))
+		}
+	} else {
+		price = rawPrice.(float64)
 	}
-	return price.(float64), nil
+	return price, nil
 }
 
 func NewJseQuote(first, second string, amount float64) (*Quote, error) {
