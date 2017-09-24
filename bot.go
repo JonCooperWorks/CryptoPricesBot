@@ -22,6 +22,7 @@ import (
 /* Web Services config */
 const (
 	CRYPTO_PRICE_API_ENDPOINT   = "https://coincap.io/page/%s"
+	CEX_IO_PRICE_API_ENDPOINT   = "https://cex.io/api/ticker/%s/%s"
 	JSE_PRICE_SCRAPING_ENDPOINT = "https://www.jamstockex.com/market-data/combined-market/summary/"
 	USERNAME_SEPARATOR          = "@"
 	BOT_NAME                    = USERNAME_SEPARATOR + "coincap_prices_bot"
@@ -29,25 +30,27 @@ const (
 
 /* Commands */
 const (
-	QUOTE_COMMAND     = "/quote"
-	START_COMMAND     = "/start"
-	HELP_COMMAND      = "/help"
-	CONVERT_COMMAND   = "/convert"
-	SOURCE_COMMAND    = "/source"
-	JSE_QUOTE_COMMAND = "/wahgwaanfi"
-	ALTERNATIVE_SPELLING_JSE_QUOTE_COMMAND = "/wagwaanfi"
+	QUOTE_COMMAND                 = "/quote"
+	START_COMMAND                 = "/start"
+	HELP_COMMAND                  = "/help"
+	CONVERT_COMMAND               = "/convert"
+	SOURCE_COMMAND                = "/source"
+	JSE_QUOTE_COMMAND             = "/wahgwaanfi"
+	ALTERNATIVE_JSE_QUOTE_COMMAND = "/wagwaanfi"
+	CEX_IO_COMMAND                = "/cexprice"
 )
 
 /* Controller routing table */
 var (
 	controllers = map[string]Controller{
-		START_COMMAND:     StartCommand,
-		QUOTE_COMMAND:     QuoteCommand,
-		HELP_COMMAND:      HelpCommand,
-		CONVERT_COMMAND:   ConvertCommand,
-		SOURCE_COMMAND:    SourceCommand,
-		JSE_QUOTE_COMMAND: JseQuoteCommand,
-		ALTERNATIVE_SPELLING_JSE_QUOTE_COMMAND: JseQuoteCommand,
+		START_COMMAND:                 StartCommand,
+		QUOTE_COMMAND:                 QuoteCommand,
+		HELP_COMMAND:                  HelpCommand,
+		CONVERT_COMMAND:               ConvertCommand,
+		SOURCE_COMMAND:                SourceCommand,
+		JSE_QUOTE_COMMAND:             JseQuoteCommand,
+		ALTERNATIVE_JSE_QUOTE_COMMAND: JseQuoteCommand,
+		CEX_IO_COMMAND:                CexPriceCommand,
 	}
 )
 
@@ -110,6 +113,14 @@ const (
 		"Try again later or ask me about a cryptocurrency.\n" +
 		"https://twitter.com/jastockex?lang=en"
 	JSE_STOCK_NOT_FOUND_MESSAGE = "I can't find '%s' on the JSE."
+)
+
+/* cex.io Messages */
+const (
+	CEX_IO_UNAVAILABLE_MESSAGE = "I can't reach https://cex.io right now.\n" +
+		"Try again later."
+	CEX_IO_BAD_RESPONSE_MESSAGE = "I'm having trouble reading the response for '%s/%s' from https://cex.io."
+	CEX_IO_PAIR_NOT_FOUND_MESSAGE = "I can't find '%s/%s' on https://cex.io"
 )
 
 /* JSE Cache */
@@ -229,6 +240,66 @@ func JseQuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []s
 
 	reply(bot, update, quote.String())
 
+}
+
+func CexPriceCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
+	if len(arguments) < 1 {
+		HelpCommand(bot, update, arguments)
+		return
+	}
+
+	first := strings.ToUpper(arguments[0])
+	var second string
+	if len(arguments) == 2 {
+		second = strings.ToUpper(arguments[1])
+	} else {
+		second = "USD"
+	}
+
+	quote, err := NewCexIoQuote(first, second, 1)
+	if err != nil {
+		reply(bot, update, err.Error())
+		return
+	}
+	reply(bot, update, quote.String())
+}
+
+func NewCexIoQuote(first, second string, amount float64) (*Quote, error) {
+	url := fmt.Sprintf(CEX_IO_PRICE_API_ENDPOINT, first, second)
+	log.Printf("Looking up %s/%s at %s", first, second, url)
+	resp, err := http.Get(url)
+	log.Printf("Looking up '%s/%s' on cex.io", first, second)
+	if err != nil || resp.StatusCode != 200 {
+		log.Println("Cex.io unavailable.")
+		return nil, errors.New(CEX_IO_UNAVAILABLE_MESSAGE)
+	}
+
+	var coinQuoteResponse map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&coinQuoteResponse)
+	if err != nil {
+		log.Println(err)
+		return nil, errors.New(fmt.Sprintf(CEX_IO_BAD_RESPONSE_MESSAGE, first, second))
+	}
+
+	rawCoinPrice, found := coinQuoteResponse["last"]
+	if !found {
+		return nil, errors.New(fmt.Sprintf(CEX_IO_PAIR_NOT_FOUND_MESSAGE, first, second))
+	}
+	coinPrice, err := strconv.ParseFloat(rawCoinPrice.(string), 64)
+	if err != nil {
+		log.Printf("Coin price for %s/%s is not a float or numeric type, got: '%v'", first, second, rawCoinPrice)
+		return nil, errors.New(
+			fmt.Sprintf(CEX_IO_BAD_RESPONSE_MESSAGE, first, second),
+		)
+	}
+
+
+	return &Quote{
+		First:  first,
+		Second: second,
+		Price:  coinPrice,
+		Amount: amount,
+	}, nil
 }
 
 func scrapeJseWebsite(ticker string) (float64, error) {
