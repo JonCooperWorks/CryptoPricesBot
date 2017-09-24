@@ -113,7 +113,7 @@ const (
 /* JSE Cache */
 var (
 	// TODO: Expire next day at 2PM
-	JSE_CACHE = cache.New(30*time.Minute, 1*time.Hour)
+	JSE_CACHE = cache.New(1*time.Hour, 2*time.Hour)
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -295,53 +295,16 @@ func isFiat(ticker string) bool {
 }
 
 func NewCryptoQuote(first, second string, amount float64) (*Quote, error) {
-	log.Printf("Looking up %s/%s", first, second)
-	var coinPrice float64
 	if isFiatInvolved(first, second) {
-		var url string
-		if isFiat(first) {
-			url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, second)
-		} else {
-			url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, first)
-		}
-
-		log.Printf("Looking up price at %s", url)
-		response, err := http.Get(url)
-		if err != nil {
-			return nil, errors.New(COINCAP_UNAVAILABLE_MESSAGE)
-		}
-
-		if response.ContentLength == 2 {
-			return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_COINCAP_MESSAGE, first, second))
-		}
-
-		var coinQuoteResponse map[string]interface{}
-		err = json.NewDecoder(response.Body).Decode(&coinQuoteResponse)
-		if err != nil {
-			return nil, errors.New(fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second))
-		}
-		var rawCoinPrice interface{}
-		if isFiat(first) {
-			rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[first]]
-		} else {
-			rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[second]]
-		}
-
-		switch rawCoinPrice.(type) {
-		case float64, float32:
-			if isFiat(second) {
-				coinPrice = rawCoinPrice.(float64)
-			} else {
-				// Fees and whatnot
-				coinPrice = 0.993 / rawCoinPrice.(float64)
-			}
-		default:
-			log.Printf("Coin price for %s/%s is not a float or numeric type, got: %v", first, second, rawCoinPrice)
-			return nil, errors.New(
-				fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second),
-			)
-		}
+		return NewCoinCapQuote(first, second, amount)
 	} else {
+		return NewShapeShiftQuote(first, second, amount)
+	}
+}
+
+
+func NewShapeShiftQuote(first, second string, amount float64) (*Quote, error) {
+	log.Printf("Looking up %s/%s", first, second)
 		pair := shapeshift.Pair{Name: fmt.Sprintf("%s_%s", first, second)}
 		log.Printf("Contacting https://shapeshift.io for %s", pair.Name)
 		info, err := pair.GetInfo()
@@ -354,14 +317,67 @@ func NewCryptoQuote(first, second string, amount float64) (*Quote, error) {
 			return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE, first, second, info.ErrorMsg()))
 		}
 
-		coinPrice = info.Rate
-	}
 	return &Quote{
 		First:  first,
 		Second: second,
-		Price:  coinPrice,
+		Price:  info.Rate,
 		Amount: amount,
 	}, nil
+}
+
+func NewCoinCapQuote(first, second string , amount float64) (*Quote, error) {
+	var url string
+	if isFiat(first) {
+		url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, second)
+	} else {
+		url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, first)
+	}
+
+	log.Printf("Looking up price at %s", url)
+	response, err := http.Get(url)
+	if err != nil {
+		return nil, errors.New(COINCAP_UNAVAILABLE_MESSAGE)
+	}
+
+	if response.ContentLength == 2 {
+		return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_COINCAP_MESSAGE, first, second))
+	}
+
+	var coinQuoteResponse map[string]interface{}
+	err = json.NewDecoder(response.Body).Decode(&coinQuoteResponse)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second))
+	}
+	var rawCoinPrice interface{}
+	if isFiat(first) {
+		rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[first]]
+	} else {
+		rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[second]]
+	}
+
+	var coinPrice float64
+	switch rawCoinPrice.(type) {
+	case float64, float32:
+		if isFiat(second) {
+			coinPrice = rawCoinPrice.(float64)
+		} else {
+			// Fees and whatnot
+			coinPrice = 0.993 / rawCoinPrice.(float64)
+		}
+	default:
+		log.Printf("Coin price for %s/%s is not a float or numeric type, got: %v", first, second, rawCoinPrice)
+		return nil, errors.New(
+			fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second),
+		)
+	}
+
+		return &Quote{
+			First:  first,
+			Second: second,
+			Price:  coinPrice,
+			Amount: amount,
+		}, nil
+
 }
 
 func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
