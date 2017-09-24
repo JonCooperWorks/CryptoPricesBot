@@ -302,20 +302,19 @@ func NewCryptoQuote(first, second string, amount float64) (*Quote, error) {
 	}
 }
 
-
 func NewShapeShiftQuote(first, second string, amount float64) (*Quote, error) {
 	log.Printf("Looking up %s/%s", first, second)
-		pair := shapeshift.Pair{Name: fmt.Sprintf("%s_%s", first, second)}
-		log.Printf("Contacting https://shapeshift.io for %s", pair.Name)
-		info, err := pair.GetInfo()
-		if err != nil {
-			return nil, errors.New(SHAPESHIFT_UNAVAILABLE_MESSAGE)
-		}
+	pair := shapeshift.Pair{Name: fmt.Sprintf("%s_%s", first, second)}
+	log.Printf("Contacting https://shapeshift.io for %s", pair.Name)
+	info, err := pair.GetInfo()
+	if err != nil {
+		return nil, errors.New(SHAPESHIFT_UNAVAILABLE_MESSAGE)
+	}
 
-		if info.ErrorMsg() != "" {
-			log.Println(info.ErrorMsg())
-			return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE, first, second, info.ErrorMsg()))
-		}
+	if info.ErrorMsg() != "" {
+		log.Println(info.ErrorMsg())
+		return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE, first, second, info.ErrorMsg()))
+	}
 
 	return &Quote{
 		First:  first,
@@ -325,7 +324,7 @@ func NewShapeShiftQuote(first, second string, amount float64) (*Quote, error) {
 	}, nil
 }
 
-func NewCoinCapQuote(first, second string , amount float64) (*Quote, error) {
+func NewCoinCapQuote(first, second string, amount float64) (*Quote, error) {
 	var url string
 	if isFiat(first) {
 		url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, second)
@@ -371,12 +370,12 @@ func NewCoinCapQuote(first, second string , amount float64) (*Quote, error) {
 		)
 	}
 
-		return &Quote{
-			First:  first,
-			Second: second,
-			Price:  coinPrice,
-			Amount: amount,
-		}, nil
+	return &Quote{
+		First:  first,
+		Second: second,
+		Price:  coinPrice,
+		Amount: amount,
+	}, nil
 
 }
 
@@ -397,7 +396,7 @@ func routeCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 }
 
 func NewCommand(update tgbotapi.Update) (*Command, error) {
-	log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+	log.Printf("[%s - %s] %s", update.Message.From.UserName, update.Message.From.FirstName, update.Message.Text)
 	parts := parseArgumentsFromUpdate(update.Message.Text)
 	if len(parts) < 1 {
 		return nil, errors.New(fmt.Sprintf("Error parsing arguments from %s", update.Message.Text))
