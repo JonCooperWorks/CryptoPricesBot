@@ -81,9 +81,9 @@ var (
 /* Crypto Messages */
 const (
 	WELCOME_MESSAGE = "Ask me for prices with /quote (ticker).\n" +
-		"Example: /quote BTC or /quote BTC EUR.\n" +
+		"Example: /quote BTC or /quote BTC EUR.\n\n" +
 		"You can also convert specific amounts with /convert (amount) (from) (to).\n" +
-		"Example: /convert 100 BTC USD.\n" +
+		"Example: /convert 100 BTC USD.\n\n" +
 		"I can also tell you wah gwaan fi a stock on the Jamaica Stock Exchange " +
 		"(http://jamstockex.com/market-data/combined-market/summary/)\n" +
 		"Example: /wahgwaanfi NCBFG"
@@ -119,8 +119,16 @@ const (
 const (
 	CEX_IO_UNAVAILABLE_MESSAGE = "I can't reach https://cex.io right now.\n" +
 		"Try again later."
-	CEX_IO_BAD_RESPONSE_MESSAGE = "I'm having trouble reading the response for '%s/%s' from https://cex.io."
+	CEX_IO_BAD_RESPONSE_MESSAGE   = "I'm having trouble reading the response for '%s/%s' from https://cex.io."
 	CEX_IO_PAIR_NOT_FOUND_MESSAGE = "I can't find '%s/%s' on https://cex.io"
+)
+
+/* Source URLs */
+const (
+	CEX_IO_SOURCE_URL     = "https://cex.io/r/0/up100029857/0/"
+	SHAPESHIFT_SOURCE_URL = "https://shapeshift.io/#/coins"
+	COINCAP_SOURCE_URL    = "https://coincap.io"
+	JSE_SOURCE_URL        = "https://www.jamstockex.com/market-data/summary/"
 )
 
 /* JSE Cache */
@@ -138,10 +146,11 @@ type Command struct {
 }
 
 type Quote struct {
-	Second string
-	First  string
-	Price  float64
-	Amount float64
+	Second    string
+	First     string
+	Price     float64
+	Amount    float64
+	SourceUrl string
 }
 
 func (quote *Quote) String() string {
@@ -160,11 +169,20 @@ func (quote *Quote) String() string {
 	} else {
 		quoteMessage += "%s%.2f"
 	}
+
+	quoteMessage += "."
+
+	if quote.SourceUrl != "" {
+		quoteMessage += "\n\nQuote fetched from: %s"
+	} else {
+		quoteMessage += "%s"
+	}
+
 	symbol := SYMBOLS[quote.Second]
 	if symbol == "" {
 		symbol = quote.Second
 	}
-	return fmt.Sprintf(quoteMessage, quote.Amount, quote.First, symbol, cost)
+	return fmt.Sprintf(quoteMessage, quote.Amount, quote.First, symbol, cost, quote.SourceUrl)
 }
 
 func StartCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
@@ -293,19 +311,18 @@ func NewCexIoQuote(first, second string, amount float64) (*Quote, error) {
 		)
 	}
 
-
 	return &Quote{
-		First:  first,
-		Second: second,
-		Price:  coinPrice,
-		Amount: amount,
+		First:     first,
+		Second:    second,
+		Price:     coinPrice,
+		Amount:    amount,
+		SourceUrl: CEX_IO_SOURCE_URL,
 	}, nil
 }
 
 func scrapeJseWebsite(ticker string) (float64, error) {
 	rawPrice, found := JSE_CACHE.Get(ticker)
 	if !found {
-
 		resp, err := http.Get(JSE_PRICE_SCRAPING_ENDPOINT)
 		log.Printf("Looking up %s on the JSE", ticker)
 		if err != nil || resp.StatusCode != 200 {
@@ -360,10 +377,11 @@ func NewJseQuote(first, second string, amount float64) (*Quote, error) {
 		}
 	}
 	return &Quote{
-		First:  first,
-		Second: second,
-		Amount: amount,
-		Price:  price.(float64),
+		First:     first,
+		Second:    second,
+		Amount:    amount,
+		Price:     price.(float64),
+		SourceUrl: JSE_SOURCE_URL,
 	}, nil
 }
 
@@ -397,10 +415,11 @@ func NewShapeShiftQuote(first, second string, amount float64) (*Quote, error) {
 	}
 
 	return &Quote{
-		First:  first,
-		Second: second,
-		Price:  info.Rate,
-		Amount: amount,
+		First:     first,
+		Second:    second,
+		Price:     info.Rate,
+		Amount:    amount,
+		SourceUrl: SHAPESHIFT_SOURCE_URL,
 	}, nil
 }
 
@@ -451,10 +470,11 @@ func NewCoinCapQuote(first, second string, amount float64) (*Quote, error) {
 	}
 
 	return &Quote{
-		First:  first,
-		Second: second,
-		Price:  coinPrice,
-		Amount: amount,
+		First:     first,
+		Second:    second,
+		Price:     coinPrice,
+		Amount:    amount,
+		SourceUrl: COINCAP_SOURCE_URL,
 	}, nil
 
 }
@@ -519,8 +539,11 @@ func worker(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	}
 }
 
-func main() {
+func init() {
 	log.SetOutput(os.Stdout)
+}
+
+func main() {
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_BOT_TOKEN"))
 	if err != nil {
 		log.Fatal(err)
