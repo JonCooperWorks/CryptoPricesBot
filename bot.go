@@ -23,7 +23,7 @@ import (
 const (
 	CRYPTO_PRICE_API_ENDPOINT   = "https://coincap.io/page/%s"
 	CEX_IO_PRICE_API_ENDPOINT   = "https://cex.io/api/ticker/%s/%s"
-	JSE_PRICE_SCRAPING_ENDPOINT = "https://www.jamstockex.com/market-data/combined-market/summary/"
+	JSE_PRICE_SCRAPING_ENDPOINT = "https://www.jamstockex.com/ticker-data"
 	USERNAME_SEPARATOR          = "@"
 	BOT_NAME                    = USERNAME_SEPARATOR + "coincap_prices_bot"
 )
@@ -75,6 +75,7 @@ var (
 		"DOGE":  "Ð",
 		"ZEC":   "ⓩ",
 		"JMD":   "J$",
+		"GBP":   "£",
 	}
 )
 
@@ -128,7 +129,7 @@ const (
 	CEX_IO_SOURCE_URL     = "https://cex.io/r/0/up100029857/0/"
 	SHAPESHIFT_SOURCE_URL = "https://shapeshift.io/#/coins"
 	COINCAP_SOURCE_URL    = "https://coincap.io"
-	JSE_SOURCE_URL        = "https://www.jamstockex.com/market-data/summary/"
+	JSE_SOURCE_URL        = "https://www.jamstockex.com/ticker-data"
 )
 
 /* JSE Cache */
@@ -320,13 +321,18 @@ func NewCexIoQuote(first, second string, amount float64) (*Quote, error) {
 	}, nil
 }
 
-func scrapeJseWebsite(ticker string) (float64, error) {
+func getJsePrice(ticker string) (float64, error) {
 	rawPrice, found := JSE_CACHE.Get(ticker)
 	if !found {
 		resp, err := http.Get(JSE_PRICE_SCRAPING_ENDPOINT)
-		log.Printf("Looking up %s on the JSE", ticker)
-		if err != nil || resp.StatusCode != 200 {
-			log.Println("Patty dem run out.")
+		log.Printf("Looking up %s on the JSE at %s", ticker, JSE_PRICE_SCRAPING_ENDPOINT)
+		if err != nil {
+			log.Println(err.Error())
+			return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
+		}
+
+		if resp.StatusCode != 200 {
+			log.Println("Got status ", resp.StatusCode, " from the JSE looking up ", ticker)
 			return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
 		}
 		document, err := goquery.NewDocumentFromResponse(resp)
@@ -335,32 +341,39 @@ func scrapeJseWebsite(ticker string) (float64, error) {
 			return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
 		}
 
-		// Get all the table rows and loop through them
-		document.Find("table tbody tr").Each(func(row int, selection *goquery.Selection) {
-			// For each row, pull out the ticker and price
-			uriContainingTicker, exists := selection.Find("td a").Attr("href")
-			if !exists {
-				log.Printf("No URL found at row '%d' on table.", row)
-				return
-			}
-			ticker := strings.TrimSpace(strings.Split(uriContainingTicker, "/")[4])
-			ticker = strings.ToUpper(ticker)
-			priceText := selection.Find("td").Eq(2).Text()
-			price, err := strconv.ParseFloat(strings.TrimSpace(priceText), 64)
-			if err != nil {
-				log.Println(err.Error())
-				return
-			}
+		document.Find("li").Each(
+			func(i int, s *goquery.Selection) {
+				stockInformation := s.Find("a").Text()
+				stockQuote := []string{}
+				for _, datapoint := range strings.Split(stockInformation, "\n") {
+					datapoint = strings.TrimSpace(datapoint)
+					if strings.TrimSpace(datapoint) == "" {
+						continue
+					}
+					stockQuote = append(stockQuote, datapoint)
+				}
 
-			JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)
-		})
+				// Skip those random empty entries
+				if len(stockQuote) < 3 {
+					return
+				}
+
+				log.Println(stockQuote)
+				ticker := stockQuote[0]
+				// Get the "$" out of the price
+				price, err := strconv.ParseFloat(stockQuote[2][1:], 64)
+				if err != nil {
+					log.Println(err.Error())
+					return
+				}
+				JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)
+			})
 
 		rawPrice, found = JSE_CACHE.Get(ticker)
 		if !found {
 			return 0, errors.New(fmt.Sprintf(JSE_STOCK_NOT_FOUND_MESSAGE, ticker))
 		}
 	}
-
 	return rawPrice.(float64), nil
 }
 
@@ -368,13 +381,10 @@ func NewJseQuote(first, second string, amount float64) (*Quote, error) {
 	// Return prices from cache
 	var price interface{}
 	var err error
-	price, found := JSE_CACHE.Get(first)
-	if !found {
-		price, err = scrapeJseWebsite(first)
-		if err != nil {
-			log.Printf("Could not find '%s' on the JSE", first)
-			return nil, err
-		}
+	price, err = getJsePrice(first)
+	if err != nil {
+		log.Printf("Could not find '%s' on the JSE", first)
+		return nil, err
 	}
 	return &Quote{
 		First:     first,
