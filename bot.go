@@ -351,14 +351,21 @@ func getJsePrice(ticker string) (float64, error) {
 					}
 					stockQuote = append(stockQuote, datapoint)
 				}
+				log.Println(stockQuote)
 				// Skip those random empty entries
-				if len(stockQuote) < 5 {
+				if len(stockQuote) < 4 {
 					return
 				}
 
 				ticker := stockQuote[0]
 				// Get the "$" out of the price
-				rawPrice := strings.Replace(stockQuote[3][1:], ",", "", -1)
+				var index int
+				if len(stockQuote) == 4 {
+					index = 2
+				} else {
+					index = 3
+				}
+				rawPrice := strings.Replace(stockQuote[index][1:], ",", "", -1)
 				price, err := strconv.ParseFloat(rawPrice, 64)
 				if err != nil {
 					log.Println(err.Error())
