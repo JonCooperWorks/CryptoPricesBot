@@ -361,7 +361,8 @@ func getJsePrice(ticker string) (float64, error) {
 				log.Println(stockQuote)
 				ticker := stockQuote[0]
 				// Get the "$" out of the price
-				price, err := strconv.ParseFloat(stockQuote[2][1:], 64)
+				rawPrice := strings.Replace(stockQuote[2][1:], ",", "", -1)
+				price, err := strconv.ParseFloat(rawPrice, 64)
 				if err != nil {
 					log.Println(err.Error())
 					return
