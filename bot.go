@@ -134,7 +134,6 @@ const (
 
 /* JSE Cache */
 var (
-	// TODO: Expire next day at 2PM
 	JSE_CACHE = cache.New(1*time.Hour, 2*time.Hour)
 )
 
@@ -380,9 +379,7 @@ func getJsePrice(ticker string) (float64, error) {
 
 func NewJseQuote(first, second string, amount float64) (*Quote, error) {
 	// Return prices from cache
-	var price interface{}
-	var err error
-	price, err = getJsePrice(first)
+	price, err := getJsePrice(first)
 	if err != nil {
 		log.Printf("Could not find '%s' on the JSE", first)
 		return nil, err
@@ -391,7 +388,7 @@ func NewJseQuote(first, second string, amount float64) (*Quote, error) {
 		First:     first,
 		Second:    second,
 		Amount:    amount,
-		Price:     price.(float64),
+		Price:     price,
 		SourceUrl: JSE_SOURCE_URL,
 	}, nil
 }
