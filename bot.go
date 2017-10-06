@@ -537,7 +537,7 @@ func parseArgumentsFromUpdate(message string) []string {
 
 func worker(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	for update := range updates {
-		if update.Message == nil {
+		if update.Message == nil || strings.TrimSpace(update.Message.Text) == "" {
 			continue
 		}
 
