@@ -23,7 +23,7 @@ import (
 const (
 	CRYPTO_PRICE_API_ENDPOINT   = "https://coincap.io/page/%s"
 	CEX_IO_PRICE_API_ENDPOINT   = "https://cex.io/api/ticker/%s/%s"
-	JSE_PRICE_SCRAPING_ENDPOINT = "https://www.jamstockex.com/ticker-data"
+	JSE_PRICE_SCRAPING_ENDPOINT = "https://www.jamstockex.com"
 	USERNAME_SEPARATOR          = "@"
 	BOT_NAME                    = USERNAME_SEPARATOR + "coincap_prices_bot"
 )
@@ -351,16 +351,17 @@ func getJsePrice(ticker string) (float64, error) {
 					}
 					stockQuote = append(stockQuote, datapoint)
 				}
+				log.Println(stockQuote)
 
 				// Skip those random empty entries
-				if len(stockQuote) < 3 {
+				if len(stockQuote) < 5 {
+					log.Printf("Quote has %d fields", len(stockQuote))
 					return
 				}
 
-				log.Println(stockQuote)
 				ticker := stockQuote[0]
 				// Get the "$" out of the price
-				rawPrice := strings.Replace(stockQuote[2][1:], ",", "", -1)
+				rawPrice := strings.Replace(stockQuote[3][1:], ",", "", -1)
 				price, err := strconv.ParseFloat(rawPrice, 64)
 				if err != nil {
 					log.Println(err.Error())
