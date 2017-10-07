@@ -351,7 +351,6 @@ func getJsePrice(ticker string) (float64, error) {
 					}
 					stockQuote = append(stockQuote, datapoint)
 				}
-				log.Println(stockQuote)
 				// Skip those random empty entries
 				if len(stockQuote) < 4 {
 					return
