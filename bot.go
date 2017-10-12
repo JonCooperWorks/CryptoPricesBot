@@ -499,6 +499,10 @@ func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
 
 func routeCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	command, err := NewCommand(update)
+	if command == nil {
+		// STFU when there's no command
+		return
+	}
 	if err != nil {
 		log.Println(err.Error())
 		HelpCommand(bot, update, []string{})
@@ -512,6 +516,8 @@ func NewCommand(update tgbotapi.Update) (*Command, error) {
 	parts := parseArgumentsFromUpdate(update.Message.Text)
 	if len(parts) < 1 {
 		return nil, errors.New(fmt.Sprintf("Error parsing arguments from '%s'", update.Message.Text))
+	} else if len(parts) > 3 {
+		return nil, nil
 	}
 
 	if !update.Message.IsCommand() {
