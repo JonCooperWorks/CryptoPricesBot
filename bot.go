@@ -516,7 +516,7 @@ func NewCommand(update tgbotapi.Update) (*Command, error) {
 	parts := parseArgumentsFromUpdate(update.Message.Text)
 	if len(parts) < 1 {
 		return nil, errors.New(fmt.Sprintf("Error parsing arguments from '%s'", update.Message.Text))
-	} else if len(parts) > 3 {
+	} else if len(parts) > 3 && !update.Message.IsCommand() {
 		return nil, nil
 	}
 
