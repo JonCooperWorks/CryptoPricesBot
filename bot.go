@@ -15,13 +15,14 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/hunterlong/shapeshift"
+	coinApi "github.com/joncooperworks/go-coinmarketcap"
 	"github.com/patrickmn/go-cache"
 	"gopkg.in/telegram-bot-api.v4"
+	"reflect"
 )
 
 /* Web Services config */
 const (
-	CRYPTO_PRICE_API_ENDPOINT   = "https://coincap.io/page/%s"
 	CEX_IO_PRICE_API_ENDPOINT   = "https://cex.io/api/ticker/%s/%s"
 	JSE_PRICE_SCRAPING_ENDPOINT = "https://www.jamstockex.com"
 	USERNAME_SEPARATOR          = "@"
@@ -57,8 +58,9 @@ var (
 /* Fiat currencies returned in coincap.io responses */
 var (
 	FIAT_CURRENCIES = map[string]string{
-		"USD": "price_usd",
-		"EUR": "price_eur",
+		"USD": "PriceUsd",
+		"EUR": "PriceEur",
+		"GBP": "PriceGbp",
 	}
 
 	SYMBOLS = map[string]string{
@@ -96,9 +98,6 @@ const (
 		"Supported currencies for cryptocurrency lookups: USD, EUR and all cryptocurrency pairs on https://shapeshift.io.\n" +
 		"I can also tell you wah gwaan fi stocks on the Jamaica Stock Exchange.\n" +
 		"For example, /wahgwaanfi NCBFG"
-	COINCAP_BAD_RESPONSE_MESSAGE         = "I can't read the response from https://coincap.io for '%s/%s.'"
-	COINCAP_UNAVAILABLE_MESSAGE          = "I'm having trouble reaching https://coincap.io. Try again later."
-	COIN_NOT_FOUND_ON_COINCAP_MESSAGE    = "I can't find '%s/%s' on https://coincap.io."
 	SHAPESHIFT_UNAVAILABLE_MESSAGE       = "I'm having trouble contacting https://shapeshift.io. Try again later."
 	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "Error looking up '%s/%s' on https://shapeshift.io.\n%s"
 	CONVERT_AMOUNT_NUMERIC_MESSAGE       = "Only numbers can be used with /convert.\n" +
@@ -406,7 +405,7 @@ func isFiat(ticker string) bool {
 
 func NewCryptoQuote(first, second string, amount float64) (*Quote, error) {
 	if isFiatInvolved(first, second) {
-		return NewCoinCapQuote(first, second, amount)
+		return NewCoinMarketCapQuote(first, second, amount)
 	} else {
 		return NewShapeShiftQuote(first, second, amount)
 	}
@@ -435,50 +434,41 @@ func NewShapeShiftQuote(first, second string, amount float64) (*Quote, error) {
 	}, nil
 }
 
-func NewCoinCapQuote(first, second string, amount float64) (*Quote, error) {
-	var url string
+func NewCoinMarketCapQuote(first, second string, amount float64) (*Quote, error) {
+	var ticker string
+	var base string
 	if isFiat(first) {
-		url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, second)
+		base = first
+		ticker = second
 	} else {
-		url = fmt.Sprintf(CRYPTO_PRICE_API_ENDPOINT, first)
+		base = second
+		ticker = first
 	}
-
-	log.Printf("Looking up price at '%s'", url)
-	response, err := http.Get(url)
+	coinInfo, err := coinApi.GetAllCoinData(base)
 	if err != nil {
-		return nil, errors.New(COINCAP_UNAVAILABLE_MESSAGE)
-	}
-
-	if response.ContentLength == 2 {
-		return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_COINCAP_MESSAGE, first, second))
-	}
-
-	var coinQuoteResponse map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&coinQuoteResponse)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second))
-	}
-	var rawCoinPrice interface{}
-	if isFiat(first) {
-		rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[first]]
-	} else {
-		rawCoinPrice = coinQuoteResponse[FIAT_CURRENCIES[second]]
+		log.Println(err.Error())
+		return nil, errors.New(fmt.Sprintf("Could not find %s/%s on https://coinmarketcap.com", first, second))
 	}
 
 	var coinPrice float64
-	switch rawCoinPrice.(type) {
-	case float64, float32:
-		if isFiat(second) {
-			coinPrice = rawCoinPrice.(float64)
-		} else {
-			// Fees and whatnot
-			coinPrice = 0.993 / rawCoinPrice.(float64)
+	found := false
+	for _, coin := range coinInfo {
+		if coin.Symbol == ticker {
+			r := reflect.ValueOf(coin)
+			fieldName := FIAT_CURRENCIES[base]
+			log.Printf("Getting conversion for %s at coin.%s", base, fieldName)
+			rawCoinPrice := reflect.Indirect(r).FieldByName(fieldName)
+			coinPrice = rawCoinPrice.Float()
+			found = true
+			break
 		}
-	default:
-		log.Printf("Coin price for %s/%s is not a float or numeric type, got: '%v'", first, second, rawCoinPrice)
-		return nil, errors.New(
-			fmt.Sprintf(COINCAP_BAD_RESPONSE_MESSAGE, first, second),
-		)
+	}
+
+	if !found {
+		return nil, errors.New(fmt.Sprintf("%s/%s not found on https://coinmarketcap.com", first, second))
+	}
+	if isFiat(first) {
+		coinPrice = 1 / coinPrice
 	}
 
 	return &Quote{
