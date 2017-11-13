@@ -55,7 +55,7 @@ var (
 	}
 )
 
-/* Fiat currencies returned in coincap.io responses */
+/* Fiat currencies returned in coinmarketcap.com responses */
 var (
 	FIAT_CURRENCIES = map[string]string{
 		"USD": "PriceUsd",
@@ -90,7 +90,7 @@ const (
 		"I can also tell you wah gwaan fi a stock on the Jamaica Stock Exchange " +
 		"(http://jamstockex.com/market-data/combined-market/summary/)\n" +
 		"Example: /wahgwaanfi NCBFG"
-	HELP_MESSAGE = "Use me to get prices from https://coincap.io and https://shapeshift.io.\n" +
+	HELP_MESSAGE = "Use me to get prices from https://coinmarketcap.com and https://shapeshift.io.\n" +
 		"Just type /quote (First Symbol).\n" +
 		"For example, /quote BTC or /quote BTC EUR.\n" +
 		"To convert a specific amount, use the convert command.\n" +
@@ -127,7 +127,7 @@ const (
 const (
 	CEX_IO_SOURCE_URL     = "https://cex.io/r/0/up100029857/0/"
 	SHAPESHIFT_SOURCE_URL = "https://shapeshift.io/#/coins"
-	COINCAP_SOURCE_URL    = "https://coincap.io"
+	COINCAP_SOURCE_URL    = "https://coinmarketcap.com"
 	JSE_SOURCE_URL        = "https://www.jamstockex.com/ticker-data"
 )
 
@@ -137,7 +137,6 @@ var (
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
-type QuoteSource func(first, second string, amount float64) (*Quote, error)
 
 type Command struct {
 	Controller Controller
