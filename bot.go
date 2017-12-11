@@ -13,12 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"reflect"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/hunterlong/shapeshift"
 	coinApi "github.com/joncooperworks/go-coinmarketcap"
 	"github.com/patrickmn/go-cache"
 	"gopkg.in/telegram-bot-api.v4"
-	"reflect"
 )
 
 /* Web Services config */
@@ -39,6 +40,7 @@ const (
 	JSE_QUOTE_COMMAND             = "/wahgwaanfi"
 	ALTERNATIVE_JSE_QUOTE_COMMAND = "/wagwaanfi"
 	CEX_IO_COMMAND                = "/cexprice"
+	TRADE_COMMAND                 = "/trade"
 )
 
 /* Controller routing table */
@@ -133,7 +135,7 @@ const (
 
 /* JSE Cache */
 var (
-	JSE_CACHE = cache.New(1*time.Hour, 2*time.Hour)
+	JSE_CACHE = cache.New(10*time.Minute, 10*time.Minute)
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
