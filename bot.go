@@ -111,7 +111,8 @@ const (
 
 /* JSE Messages */
 const (
-	JSE_UNAVAILABLE_MESSAGE = "I can't read the response from the JSE website.\n" +
+	JSE_UNAVAILABLE_MESSAGE = "Wah you mean you wah know the price?\n" +
+		"Oven deven plug in!\n" +
 		"Try again later or ask me about a cryptocurrency.\n" +
 		"https://twitter.com/jastockex?lang=en"
 	JSE_STOCK_NOT_FOUND_MESSAGE = "I can't find '%s' on the JSE."
