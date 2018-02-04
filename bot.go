@@ -39,6 +39,7 @@ const (
 	SOURCE_COMMAND                = "/source"
 	JSE_QUOTE_COMMAND             = "/wahgwaanfi"
 	ALTERNATIVE_JSE_QUOTE_COMMAND = "/wagwaanfi"
+	YET_ANOTHER_JSE_COMMAND       = "/jse"
 	CEX_IO_COMMAND                = "/cexprice"
 	TRADE_COMMAND                 = "/trade"
 )
