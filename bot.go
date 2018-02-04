@@ -54,6 +54,7 @@ var (
 		SOURCE_COMMAND:                SourceCommand,
 		JSE_QUOTE_COMMAND:             JseQuoteCommand,
 		ALTERNATIVE_JSE_QUOTE_COMMAND: JseQuoteCommand,
+		YET_ANOTHER_JSE_COMMAND:       JseQuoteCommand,
 		CEX_IO_COMMAND:                CexPriceCommand,
 	}
 )
