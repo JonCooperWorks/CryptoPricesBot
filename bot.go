@@ -509,7 +509,18 @@ func main() {
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
-	bot.SetWebhook(tgbotapi.NewWebhook(os.Getenv("TELEGRAM_WEBHOOK_URL")))
+	_, err = bot.SetWebhook(tgbotapi.NewWebhook(os.Getenv("TELEGRAM_WEBHOOK_URL")))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	info, err := bot.GetWebhookInfo()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if info.LastErrorDate != 0 {
+		log.Printf("Telegram callback failed: %s", info.LastErrorMessage)
+	}
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
