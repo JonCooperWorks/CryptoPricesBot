@@ -509,13 +509,13 @@ func main() {
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
+	bot.SetWebhook(tgbotapi.NewWebhook(os.Getenv("TELEGRAM_WEBHOOK_URL")))
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	updates, err := bot.GetUpdatesChan(u)
-	if err != nil {
-		log.Fatal(err)
-	}
+	updates := bot.ListenForWebhook("/" + bot.Token)
+	go http.ListenAndServe(os.Getenv("PORT"), nil)
 
 	// Goroutine pool for processing messages.
 	for i := 0; i < runtime.NumCPU()-1; i++ {
