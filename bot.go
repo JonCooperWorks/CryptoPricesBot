@@ -75,19 +75,13 @@ var (
 
 /* Crypto Messages */
 const (
-	WELCOME_MESSAGE = "Ask me for prices with /quote (ticker).\n" +
-		"Example: /quote BTC or /quote BTC EUR.\n\n" +
-		"You can also convert specific amounts with /convert (amount) (from) (to).\n" +
-		"Example: /convert 100 BTC USD.\n\n" +
+	WELCOME_MESSAGE = "Ask me for JSE stock prices." +
+		"Just send me the symbol. For example: NCBFG.\n" +
 		"I can also tell you wah gwaan fi a stock on the Jamaica Stock Exchange " +
 		"(http://jamstockex.com/market-data/combined-market/summary/)\n" +
 		"Example: /wahgwaanfi NCBFG"
-	HELP_MESSAGE = "Use me to get prices from https://coinmarketcap.com and https://shapeshift.io.\n" +
-		"Just type /quote (First Symbol).\n" +
-		"For example, /quote BTC or /quote BTC EUR.\n" +
-		"To convert a specific amount, use the convert command.\n" +
-		"For example, /convert 100 USD BTC.\n" +
-		"Supported currencies for cryptocurrency lookups: USD, EUR and all cryptocurrency pairs on https://shapeshift.io.\n" +
+	HELP_MESSAGE = "Use me to get prices from the Jamaica Stock Exchange.\n" +
+		"Just send me the symbol. For example: NCBFG.\n" +
 		"I can also tell you wah gwaan fi stocks on the Jamaica Stock Exchange.\n" +
 		"For example, /wahgwaanfi NCBFG"
 	SOURCE_MESSAGE = "You can find my source code here: " +
