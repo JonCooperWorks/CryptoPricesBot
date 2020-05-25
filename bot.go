@@ -8,13 +8,10 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
 
-	"github.com/hunterlong/shapeshift"
-	coinApi "github.com/joncooperworks/go-coinmarketcap"
 	"github.com/joncooperworks/jsonjse"
 	"gopkg.in/telegram-bot-api.v4"
 )
@@ -28,10 +25,8 @@ const (
 
 /* Commands */
 const (
-	QUOTE_COMMAND                 = "/quote"
 	START_COMMAND                 = "/start"
 	HELP_COMMAND                  = "/help"
-	CONVERT_COMMAND               = "/convert"
 	SOURCE_COMMAND                = "/source"
 	JSE_QUOTE_COMMAND             = "/wahgwaanfi"
 	ALTERNATIVE_JSE_QUOTE_COMMAND = "/wagwaanfi"
@@ -43,9 +38,7 @@ const (
 var (
 	controllers = map[string]Controller{
 		START_COMMAND:                 StartCommand,
-		QUOTE_COMMAND:                 QuoteCommand,
 		HELP_COMMAND:                  HelpCommand,
-		CONVERT_COMMAND:               ConvertCommand,
 		SOURCE_COMMAND:                SourceCommand,
 		JSE_QUOTE_COMMAND:             JseQuoteCommand,
 		ALTERNATIVE_JSE_QUOTE_COMMAND: JseQuoteCommand,
@@ -97,22 +90,9 @@ const (
 		"Supported currencies for cryptocurrency lookups: USD, EUR and all cryptocurrency pairs on https://shapeshift.io.\n" +
 		"I can also tell you wah gwaan fi stocks on the Jamaica Stock Exchange.\n" +
 		"For example, /wahgwaanfi NCBFG"
-	SHAPESHIFT_UNAVAILABLE_MESSAGE       = "I'm having trouble contacting https://shapeshift.io. Try again later."
-	COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE = "Error looking up '%s/%s' on https://shapeshift.io.\n%s"
-	CONVERT_AMOUNT_NUMERIC_MESSAGE       = "Only numbers can be used with /convert.\n" +
-		"Do not use a currency symbol."
 	SOURCE_MESSAGE = "You can find my source code here: " +
 		"https://github.com/JonCooperWorks/CryptoPricesBot.\n" +
 		"My code is licensed GPLv3, so you're free to use and modify it if you open source your modifications."
-)
-
-/* JSE Messages */
-const (
-	JSE_UNAVAILABLE_MESSAGE = "Wah you mean you wah know the price?\n" +
-		"Oven deven plug in!\n" +
-		"Try again later or ask me about a cryptocurrency.\n" +
-		"https://twitter.com/jastockex?lang=en"
-	JSE_STOCK_NOT_FOUND_MESSAGE = "I can't find '%s' on the JSE."
 )
 
 /* cex.io Messages */
@@ -126,8 +106,6 @@ const (
 /* Source URLs */
 const (
 	CEX_IO_SOURCE_URL     = "https://cex.io/r/0/up100029857/0/"
-	SHAPESHIFT_SOURCE_URL = "https://shapeshift.io/#/coins"
-	COINCAP_SOURCE_URL    = "https://coinmarketcap.com"
 	JSE_SOURCE_URL        = "https://jsonjse.herokuapp.com/jse/today"
 )
 
@@ -183,50 +161,6 @@ func HelpCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []strin
 
 func SourceCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
 	reply(bot, update, SOURCE_MESSAGE)
-}
-
-func ConvertCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
-	if len(arguments) != 3 {
-		HelpCommand(bot, update, arguments)
-		return
-	}
-	amount, err := strconv.ParseFloat(arguments[0], 64)
-	if err != nil {
-		log.Println(err.Error())
-		reply(bot, update, CONVERT_AMOUNT_NUMERIC_MESSAGE)
-		return
-	}
-	first := strings.ToUpper(arguments[1])
-	second := strings.ToUpper(arguments[2])
-	quote, err := NewCryptoQuote(first, second, amount)
-	if err != nil {
-		reply(bot, update, err.Error())
-		return
-	}
-
-	reply(bot, update, quote.String())
-}
-
-func QuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
-	if len(arguments) < 1 {
-		HelpCommand(bot, update, arguments)
-		return
-	}
-
-	first := strings.ToUpper(arguments[0])
-	var second string
-	if len(arguments) == 2 {
-		second = strings.ToUpper(arguments[1])
-	} else {
-		second = "USD"
-	}
-
-	quote, err := NewCryptoQuote(first, second, 1)
-	if err != nil {
-		reply(bot, update, err.Error())
-		return
-	}
-	reply(bot, update, quote.String())
 }
 
 func JseQuoteCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
@@ -349,84 +283,6 @@ func isFiatInvolved(first, second string) bool {
 }
 func isFiat(ticker string) bool {
 	return FIAT_CURRENCIES[ticker] != ""
-}
-
-func NewCryptoQuote(first, second string, amount float64) (*Quote, error) {
-	if isFiatInvolved(first, second) {
-		return NewCoinMarketCapQuote(first, second, amount)
-	} else {
-		return NewShapeShiftQuote(first, second, amount)
-	}
-}
-
-func NewShapeShiftQuote(first, second string, amount float64) (*Quote, error) {
-	log.Printf("Looking up %s/%s", first, second)
-	pair := shapeshift.Pair{Name: fmt.Sprintf("%s_%s", first, second)}
-	log.Printf("Contacting https://shapeshift.io for '%s'", pair.Name)
-	info, err := pair.GetInfo()
-	if err != nil {
-		return nil, errors.New(SHAPESHIFT_UNAVAILABLE_MESSAGE)
-	}
-
-	if info.ErrorMsg() != "" {
-		log.Println(info.ErrorMsg())
-		return nil, errors.New(fmt.Sprintf(COIN_NOT_FOUND_ON_SHAPESHIFT_MESSAGE, first, second, info.ErrorMsg()))
-	}
-
-	return &Quote{
-		First:     first,
-		Second:    second,
-		Price:     info.Rate,
-		Amount:    amount,
-		SourceUrl: SHAPESHIFT_SOURCE_URL,
-	}, nil
-}
-
-func NewCoinMarketCapQuote(first, second string, amount float64) (*Quote, error) {
-	var ticker string
-	var base string
-	if isFiat(first) {
-		base = first
-		ticker = second
-	} else {
-		base = second
-		ticker = first
-	}
-	coinInfo, err := coinApi.GetAllCoinData(base)
-	if err != nil {
-		log.Println(err.Error())
-		return nil, errors.New(fmt.Sprintf("Could not find %s/%s on https://coinmarketcap.com", first, second))
-	}
-
-	var coinPrice float64
-	found := false
-	for _, coin := range coinInfo {
-		if coin.Symbol == ticker {
-			r := reflect.ValueOf(coin)
-			fieldName := FIAT_CURRENCIES[base]
-			log.Printf("Getting conversion for %s at coin.%s", base, fieldName)
-			rawCoinPrice := reflect.Indirect(r).FieldByName(fieldName)
-			coinPrice = rawCoinPrice.Float()
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return nil, errors.New(fmt.Sprintf("%s/%s not found on https://coinmarketcap.com", first, second))
-	}
-	if isFiat(first) {
-		coinPrice = 1 / coinPrice
-	}
-
-	return &Quote{
-		First:     first,
-		Second:    second,
-		Price:     coinPrice,
-		Amount:    amount,
-		SourceUrl: COINCAP_SOURCE_URL,
-	}, nil
-
 }
 
 func reply(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string) {
