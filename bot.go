@@ -532,7 +532,7 @@ func main() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	updates := bot.ListenForWebhook("/" + bot.Token)
+	updates := bot.ListenForWebhook("/")
 	go listenForWebhook(updates, bot)
 
 	// Goroutine pool for processing messages.
