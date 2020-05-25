@@ -495,6 +495,10 @@ func worker(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	}
 }
 
+func listenForWebhook(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
+	http.ListenAndServe(os.Getenv("PORT"), nil)
+}
+
 func init() {
 	log.SetOutput(os.Stdout)
 }
@@ -526,7 +530,7 @@ func main() {
 	u.Timeout = 60
 
 	updates := bot.ListenForWebhook("/" + bot.Token)
-	go http.ListenAndServe(os.Getenv("PORT"), nil)
+	go listenForWebhook(updates, bot)
 
 	// Goroutine pool for processing messages.
 	for i := 0; i < runtime.NumCPU()-1; i++ {
