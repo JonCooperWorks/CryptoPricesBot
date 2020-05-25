@@ -78,7 +78,6 @@ const (
 	WELCOME_MESSAGE = "Ask me for JSE stock prices." +
 		"Just send me the symbol. For example: NCBFG.\n" +
 		"I can also tell you wah gwaan fi a stock on the Jamaica Stock Exchange " +
-		"(http://jamstockex.com/market-data/combined-market/summary/)\n" +
 		"Example: /wahgwaanfi NCBFG"
 	HELP_MESSAGE = "Use me to get prices from the Jamaica Stock Exchange.\n" +
 		"Just send me the symbol. For example: NCBFG.\n" +
