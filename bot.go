@@ -496,7 +496,7 @@ func worker(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
 }
 
 func listenForWebhook(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
-	err := http.ListenAndServe(os.Getenv("PORT"), nil)
+	err := http.ListenAndServe(":" + os.Getenv("PORT"), nil)
 	if err != nil {
 		log.Fatalf("Error starting webhook: %v", err)
 	}
