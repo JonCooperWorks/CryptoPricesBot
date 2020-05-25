@@ -460,7 +460,7 @@ func NewCommand(update tgbotapi.Update) (*Command, error) {
 
 	if !update.Message.IsCommand() {
 		return &Command{
-			Controller: QuoteCommand,
+			Controller: JseQuoteCommand,
 			Arguments:  parts,
 		}, nil
 	}
