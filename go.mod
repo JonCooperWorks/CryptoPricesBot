@@ -2,7 +2,7 @@ module github.com/joncooperworks/cryptopricesbot
 
 go 1.14
 
-// +heroku install ./bot
+// +heroku install ./
 require (
 	github.com/hunterlong/shapeshift v0.0.0-20180821065152-75f73203a884
 	github.com/joncooperworks/go-coinmarketcap v0.0.0-20171113052712-0b5c6df9fd62
