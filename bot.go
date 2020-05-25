@@ -8,26 +8,22 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
-	"reflect"
-
-	"github.com/PuerkitoBio/goquery"
 	"github.com/hunterlong/shapeshift"
 	coinApi "github.com/joncooperworks/go-coinmarketcap"
-	"github.com/patrickmn/go-cache"
+	"github.com/joncooperworks/jsonjse"
 	"gopkg.in/telegram-bot-api.v4"
 )
 
 /* Web Services config */
 const (
-	CEX_IO_PRICE_API_ENDPOINT   = "https://cex.io/api/ticker/%s/%s"
-	JSE_PRICE_SCRAPING_ENDPOINT = "https://www.jamstockex.com"
-	USERNAME_SEPARATOR          = "@"
-	BOT_NAME                    = USERNAME_SEPARATOR + "coincap_prices_bot"
+	CEX_IO_PRICE_API_ENDPOINT = "https://cex.io/api/ticker/%s/%s"
+	USERNAME_SEPARATOR        = "@"
+	BOT_NAME                  = USERNAME_SEPARATOR + "coincap_prices_bot"
 )
 
 /* Commands */
@@ -41,7 +37,6 @@ const (
 	ALTERNATIVE_JSE_QUOTE_COMMAND = "/wagwaanfi"
 	YET_ANOTHER_JSE_COMMAND       = "/jse"
 	CEX_IO_COMMAND                = "/cexprice"
-	TRADE_COMMAND                 = "/trade"
 )
 
 /* Controller routing table */
@@ -133,12 +128,7 @@ const (
 	CEX_IO_SOURCE_URL     = "https://cex.io/r/0/up100029857/0/"
 	SHAPESHIFT_SOURCE_URL = "https://shapeshift.io/#/coins"
 	COINCAP_SOURCE_URL    = "https://coinmarketcap.com"
-	JSE_SOURCE_URL        = "https://www.jamstockex.com/ticker-data"
-)
-
-/* JSE Cache */
-var (
-	JSE_CACHE = cache.New(10*time.Minute, 10*time.Minute)
+	JSE_SOURCE_URL        = "https://jsonjse.herokuapp.com/jse/today"
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -173,19 +163,14 @@ func (quote *Quote) String() string {
 		quoteMessage += "%s%.2f"
 	}
 
-	quoteMessage += "."
-
-	if quote.SourceUrl != "" {
-		quoteMessage += "\n\nQuote fetched from: %s"
-	} else {
-		quoteMessage += "%s"
-	}
+	quoteMessage += ".\n\n"
+	quoteMessage += "Shop at Afrodite for all your beauty needs. Unleash your inner goddess at https://www.afroditeja.com"
 
 	symbol := SYMBOLS[quote.Second]
 	if symbol == "" {
 		symbol = quote.Second
 	}
-	return fmt.Sprintf(quoteMessage, quote.Amount, quote.First, symbol, cost, quote.SourceUrl)
+	return fmt.Sprintf(quoteMessage, quote.Amount, quote.First, symbol, cost)
 }
 
 func StartCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, arguments []string) {
@@ -324,64 +309,23 @@ func NewCexIoQuote(first, second string, amount float64) (*Quote, error) {
 }
 
 func getJsePrice(ticker string) (float64, error) {
-	rawPrice, found := JSE_CACHE.Get(ticker)
-	if !found {
-		resp, err := http.Get(JSE_PRICE_SCRAPING_ENDPOINT)
-		log.Printf("Looking up %s on the JSE at %s", ticker, JSE_PRICE_SCRAPING_ENDPOINT)
-		if err != nil {
-			log.Println(err.Error())
-			return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
-		}
+	resp, err := http.Get(JSE_SOURCE_URL)
+	if err != nil {
+		return 0, err
+	}
 
-		if resp.StatusCode != 200 {
-			log.Println("Got status ", resp.StatusCode, " from the JSE looking up ", ticker)
-			return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
-		}
-		document, err := goquery.NewDocumentFromResponse(resp)
-		if err != nil {
-			log.Println(err.Error())
-			return 0, errors.New(JSE_UNAVAILABLE_MESSAGE)
-		}
+	var symbols []jsonjse.Symbol
+	err = json.NewDecoder(resp.Body).Decode(&symbols)
+	if err != nil {
+		return 0, err
+	}
 
-		document.Find("li").Each(
-			func(i int, s *goquery.Selection) {
-				stockInformation := s.Find("a").Text()
-				stockQuote := []string{}
-				for _, datapoint := range strings.Split(stockInformation, "\n") {
-					datapoint = strings.TrimSpace(datapoint)
-					if strings.TrimSpace(datapoint) == "" {
-						continue
-					}
-					stockQuote = append(stockQuote, datapoint)
-				}
-				// Skip those random empty entries
-				if len(stockQuote) < 4 {
-					return
-				}
-
-				ticker := stockQuote[0]
-				// Get the "$" out of the price
-				var index int
-				if len(stockQuote) == 4 {
-					index = 2
-				} else {
-					index = 3
-				}
-				rawPrice := strings.Replace(stockQuote[index][1:], ",", "", -1)
-				price, err := strconv.ParseFloat(rawPrice, 64)
-				if err != nil {
-					log.Println(err.Error())
-					return
-				}
-				JSE_CACHE.Add(ticker, price, cache.DefaultExpiration)
-			})
-
-		rawPrice, found = JSE_CACHE.Get(ticker)
-		if !found {
-			return 0, errors.New(fmt.Sprintf(JSE_STOCK_NOT_FOUND_MESSAGE, ticker))
+	for _, symbol := range symbols {
+		if symbol.Symbol == ticker {
+			return symbol.LastTraded, nil
 		}
 	}
-	return rawPrice.(float64), nil
+	return float64(0), fmt.Errorf("Could not find %v on the JSE", ticker)
 }
 
 func NewJseQuote(first, second string, amount float64) (*Quote, error) {
