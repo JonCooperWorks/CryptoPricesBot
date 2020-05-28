@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joncooperworks/jsonjse"
 	"gopkg.in/telegram-bot-api.v4"
@@ -351,11 +352,31 @@ func listenForWebhook(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	}
 }
 
+func wakeupJSONJSE() {
+	// Since Heroku puts dynos to sleep when not in use, we'll have to wait for Heroku to build a dyno for JSONJSE before we can get a response back.
+	// This is compounded by the fact that the MongoDB cache may be empty for that day, requiring a HTTP request to JSE and scraping.
+	// To minimize the time spent waiting on the Heroku startup and the cache, fill the cache when this bot starts.
+	for {
+		// Try to hit the API until we can get it
+		resp, err := http.Get(JSE_SOURCE_URL)
+		if err != nil || resp.StatusCode != 200 {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		break
+	}
+
+}
+
 func init() {
 	log.SetOutput(os.Stdout)
 }
 
 func main() {
+	// Wake up JSE API so responses are faster.
+	go wakeupJSONJSE()
+
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_BOT_TOKEN"))
 	if err != nil {
 		log.Fatal(err)
@@ -381,6 +402,7 @@ func main() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
+	// Get updates from the webhook
 	updates := bot.ListenForWebhook("/")
 	go listenForWebhook(updates, bot)
 
@@ -391,3 +413,4 @@ func main() {
 	// Block on the main thread so we don't exit
 	worker(updates, bot)
 }
+
