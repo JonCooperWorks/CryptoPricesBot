@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/joncooperworks/jsonjse"
+	"gopkg.in/telegram-bot-api.v4"
 	"log"
 	"math"
 	"net/http"
@@ -11,10 +13,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/joncooperworks/jsonjse"
-	"gopkg.in/telegram-bot-api.v4"
 )
 
 /* Web Services config */
@@ -99,8 +97,8 @@ const (
 
 /* Source URLs */
 const (
-	CEX_IO_SOURCE_URL     = "https://cex.io/r/0/up100029857/0/"
-	JSE_SOURCE_URL        = "https://jsonjse.herokuapp.com/jse/today"
+	CEX_IO_SOURCE_URL = "https://cex.io/r/0/up100029857/0/"
+	JSE_SOURCE_URL    = "https://jsonjse.herokuapp.com/jse/today"
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -346,7 +344,7 @@ func worker(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
 }
 
 func listenForWebhook(updates <-chan tgbotapi.Update, bot *tgbotapi.BotAPI) {
-	err := http.ListenAndServe(":" + os.Getenv("PORT"), nil)
+	err := http.ListenAndServe(":"+os.Getenv("PORT"), nil)
 	if err != nil {
 		log.Fatalf("Error starting webhook: %v", err)
 	}
@@ -356,15 +354,9 @@ func wakeupJSONJSE() {
 	// Since Heroku puts dynos to sleep when not in use, we'll have to wait for Heroku to build a dyno for JSONJSE before we can get a response back.
 	// This is compounded by the fact that the MongoDB cache may be empty for that day, requiring a HTTP request to JSE and scraping.
 	// To minimize the time spent waiting on the Heroku startup and the cache, fill the cache when this bot starts.
-	for {
-		// Try to hit the API until we can get it
-		resp, err := http.Get(JSE_SOURCE_URL)
-		if err != nil || resp.StatusCode != 200 {
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		break
+	resp, err := http.Get(JSE_SOURCE_URL)
+	if err != nil && resp.StatusCode == 200 {
+		log.Println("Cache primed")
 	}
 
 }
@@ -413,4 +405,3 @@ func main() {
 	// Block on the main thread so we don't exit
 	worker(updates, bot)
 }
-
