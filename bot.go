@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/joncooperworks/jsonjse"
-	"gopkg.in/telegram-bot-api.v4"
 	"log"
 	"math"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/joncooperworks/jsonjse"
+	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
 
 /* Web Services config */
@@ -98,7 +99,10 @@ const (
 /* Source URLs */
 const (
 	CEX_IO_SOURCE_URL = "https://cex.io/r/0/up100029857/0/"
-	JSE_SOURCE_URL    = "https://jsonjse.herokuapp.com/jse/today"
+)
+
+var (
+	JSE_SOURCE_URL string
 )
 
 type Controller func(*tgbotapi.BotAPI, tgbotapi.Update, []string)
@@ -363,6 +367,10 @@ func wakeupJSONJSE() {
 
 func init() {
 	log.SetOutput(os.Stdout)
+	JSE_SOURCE_URL = os.Getenv("JSE_SOURCE_URL")
+	if JSE_SOURCE_URL == "" {
+		JSE_SOURCE_URL = "https://jsonjse.fly.dev/jse/today"
+	}
 }
 
 func main() {
